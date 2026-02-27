@@ -1,0 +1,15 @@
+# Arquivos locais
+prestadores.db
+notificacoes.log
+.env
+__pycache__/
+*.pyc
+
+# Ambiente virtual
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
