@@ -1,0 +1,15 @@
+# Configurações de Ambiente (Senhas)
+.env
+
+# Banco de Dados da Unimed
+prestadores.db
+*.db-journal
+
+# Logs e Cache
+notificacoes.log
+__pycache__/
+*.pyc
+
+# Pastas de ferramentas
+.vscode/
+venv/
