@@ -1,3 +1,7 @@
 flet==0.28.3
 python-dotenv==1.0.0
 schedule==1.2.0
+jinja2==3.1.2
+holidays==0.45
+pyinstaller==6.3.0
+psycopg2-binary==2.9.9

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; background:#f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px; margin:20px auto; background:white; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+        <!-- Cabeçalho com logo (AGORA MENOR) -->
+        <tr>
+            <td style="background: {{ cor_fundo }}; padding: 15px 20px; text-align: center; border-bottom: 3px solid {{ cor_borda }};">
+                <!-- Logo com fallback para teste local -->
+                <img src="cid:logo_unimed" 
+                     alt="Unimed RV" 
+                     style="height: 40px; width: auto; margin-bottom: 8px; display: inline-block;"
+                     onerror="this.onerror=null; this.src='https://www.unimed.coop.br/image/libraries/logo-unimed.png'; this.style.height='40px';">
+                
+                <div style="background: {{ cor_borda }}; color: white; padding: 6px 12px; border-radius: 20px; display: inline-block; font-size: 13px; font-weight: bold; margin-top: 8px;">
+                    {{ tipo_display }}
+                </div>
+            </td>
+        </tr>
+        
+        <!-- Título -->
+        <tr>
+            <td style="background: {{ cor_fundo }}; padding: 20px 20px;">
+                <h2 style="margin:0; color:#1a1a1a; font-size:20px; text-align:center;">{{ icone }} {{ titulo }}</h2>
+            </td>
+        </tr>
+        
+        <!-- Conteúdo -->
+        <tr>
+            <td style="padding: 20px 20px; color: #333;">
+                <table width="100%" style="border-collapse: collapse;">
+                    <tr><td style="padding:6px 0; font-weight:bold; width:130px;">👤 Prestador:</td><td>{{ prestador }}</td></tr>
+                    <tr><td style="padding:6px 0; font-weight:bold;">📅 Referência:</td><td>{{ referencia }}</td></tr>
+                    <tr><td style="padding:6px 0; font-weight:bold;">📋 Tipo:</td><td>{{ tipo_conta }}</td></tr>
+                    
+                    <!-- PRAZO FINAL -->
+                    {% if data_fim %}
+                    <tr>
+                        <td style="padding:6px 0; font-weight:bold;">⏰ Prazo final:</td>
+                        <td>
+                            <span style="background: {{ cor_borda }}; color:white; padding:4px 12px; border-radius:20px; font-weight:bold; font-size:14px;">
+                                {{ data_fim }}
+                                {% if dias_restantes > 1 %}
+                                    ({{ dias_restantes }} dias)
+                                {% else %}
+                                    ({{ dias_restantes }} dia)
+                                {% endif %}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </table>
+                
+                <!-- Mensagem principal -->
+                <div style="margin:20px 0; padding:15px; background:#f8f9fa; border-radius:6px; line-height:1.5; font-size:14px;">
+                    {{ mensagem | safe }}
+                </div>
+                
+                <!-- Documentos específicos -->
+                {% if msg_especifica %}
+                <div style="margin:15px 0; padding:12px; background:#fff3e0; border-left:4px solid #ff9800; font-size:14px;">
+                    {{ msg_especifica | safe }}
+                </div>
+                {% endif %}
+                
+                <!-- BOTÃO DE AÇÃO -->
+                <div style="text-align: center; margin: 25px 0;">
+                    <a href="{{ url_portal }}" 
+                       style="background-color: {{ cor_botao }}; 
+                              color: #ffffff; 
+                              padding: 14px 28px; 
+                              text-decoration: none; 
+                              border-radius: 6px; 
+                              font-weight: bold; 
+                              display: inline-block;
+                              box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                              font-size: 15px;">
+                        🚀 ACESSAR PORTAL DO PRESTADOR
+                    </a>
+                    <p style="font-size: 11px; color: #666; margin-top: 8px;">
+                        Clique acima para realizar o envio das guias
+                    </p>
+                </div>
+                
+                <!-- Rodapé -->
+                <div style="margin-top: 25px; padding-top: 15px; border-top: 1px dashed #ccc; text-align: center;">
+                    <p style="font-size: 11px; color: #999; margin:2px 0;">
+                        📍 Rua Costa Gomes, 208 - Centro, Rio Verde - GO
+                    </p>
+                    <p style="font-size: 11px; color: #999; margin:2px 0;">
+                        📞 (64) 2101-4900 | 📧 {{ email_contato }}
+                    </p>
+                    <p style="font-size: 10px; color: #ccc; margin-top: 12px;">
+                        Este é um e-mail automático. Por favor, não responda esta mensagem.
+                    </p>
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

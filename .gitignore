@@ -13,3 +13,15 @@ __pycache__/
 # Pastas de ferramentas
 .vscode/
 venv/
+
+# Arquivo de teste local
+testar_envio.py
+testar_layout.py
+testar_layout2.py
+teste_envio.py
+teste.py
+teste_*.html
+inicio.html
+alerta_1.html
+alerta_5.html
+alerta_10.html
