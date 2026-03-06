@@ -1,16 +1,20 @@
-import os
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
-from contextlib import contextmanager
+import os
 import logging
+from contextlib import contextmanager
 from dotenv import load_dotenv
 
+# Carrega variáveis de ambiente
 load_dotenv()
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class NeonDatabase:
-    """Gerenciador de conexão com NeonDB (PostgreSQL)"""
+    """Gerenciador de conexão com NeonDB (PostgreSQL) com SSL forçado"""
     
     _instance = None
     _connection_pool = None
@@ -22,30 +26,30 @@ class NeonDatabase:
         return cls._instance
     
     def _initialize_pool(self):
-        """Inicializa o pool de conexões"""
+        """Inicializa o pool de conexões com SSL obrigatório"""
         try:
             database_url = os.getenv("NEON_DATABASE_URL")
             if not database_url:
-                logger.warning("NEON_DATABASE_URL não configurado, usando SQLite")
-                return
+                raise ValueError("NEON_DATABASE_URL não encontrado no .env")
             
-            # Pool de conexões (mínimo 1, máximo 10)
+            # 🔐 CONEXÃO SEGURA COM SSL FORÇADO
+            logger.info("🔐 Estabelecendo conexão segura com NeonDB (SSL)")
             self._connection_pool = psycopg2.pool.SimpleConnectionPool(
                 1, 10,
                 dsn=database_url,
                 sslmode='require'
             )
-            logger.info("✅ Pool de conexões NeonDB inicializado")
+            logger.info("✅ Pool de conexões NeonDB inicializado com SSL")
             
             # Cria tabelas se não existirem
             self._create_tables()
             
         except Exception as e:
             logger.error(f"❌ Erro ao conectar ao NeonDB: {e}")
-            self._connection_pool = None
+            raise  # Re-lança a exceção para parar o programa
     
     def _create_tables(self):
-        """Cria as tabelas no PostgreSQL"""
+        """Cria as tabelas no PostgreSQL se não existirem"""
         with self.get_cursor() as cursor:
             # Tabela de prestadores
             cursor.execute("""
@@ -111,9 +115,9 @@ class NeonDatabase:
                 self._connection_pool.putconn(conn)
     
     def get_connection(self):
-        """Retorna uma conexão direta (para operações especiais)"""
+        """Retorna uma conexão direta do pool"""
         if not self._connection_pool:
-            return None
+            raise Exception("Pool de conexões não disponível")
         return self._connection_pool.getconn()
     
     def return_connection(self, conn):
@@ -127,15 +131,14 @@ class NeonDatabase:
             self._connection_pool.closeall()
             logger.info("Pool de conexões fechado")
 
-# Singleton instance
-db = NeonDatabase()
-
-# Funções de compatibilidade com o código existente
-def get_db_connection():
-    """Retorna conexão (compatível com código antigo)"""
-    return db.get_connection()
-
-def init_db():
-    """Inicializa banco (compatível)"""
-    # Já é feito no construtor
-    pass
+# ====================== EXPORTAÇÕES ======================
+# Cria a instância única do banco
+try:
+    neon_db = NeonDatabase()
+    USAR_NEON = True
+    logger.info("✅ NeonDB inicializado com sucesso!")
+except Exception as e:
+    logger.error(f"❌ Falha ao inicializar NeonDB: {e}")
+    neon_db = None
+    USAR_NEON = False
+    raise  # Re-lança para parar o programa

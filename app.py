@@ -1,3 +1,10 @@
+# ====================== CONFIGURAÇÃO PARA EVITAR DOWNLOAD ======================
+import os
+os.environ['FLET_FORCE_LOCAL'] = '1'
+os.environ['FLET_CLI_NO_RICH_OUTPUT'] = '1'
+os.environ['FLET_VIEW_PATH'] = os.path.dirname(os.path.abspath(__file__))
+
+# Resto dos imports...
 import flet as ft
 import sqlite3
 import re
@@ -8,15 +15,16 @@ from pathlib import Path
 import asyncio
 
 # ====================== IMPORTAÇÕES DO NEONDB ======================
-# Tenta importar o NeonDB, se falhar continua com SQLite
+# Agora é OBRIGATÓRIO - não tem fallback
 try:
     from database_neon import neon_db, USAR_NEON
     from psycopg2.extras import RealDictCursor
     print("✅ Módulo NeonDB carregado com sucesso!")
-except ImportError:
-    USAR_NEON = False
-    neon_db = None
-    print("⚠️ NeonDB não disponível, usando SQLite")
+    USAR_NEON = True  # Força TRUE
+except ImportError as e:
+    print(f"❌ ERRO CRÍTICO: NeonDB não disponível - {e}")
+    print("O sistema precisa do NeonDB para funcionar.")
+    sys.exit(1)
 
 # ====================== CONFIGURAÇÃO DE CAMINHOS ======================
 def get_base_path():
@@ -26,7 +34,8 @@ def get_base_path():
         return Path(__file__).parent
 
 BASE_PATH = get_base_path()
-DB_PATH = BASE_PATH / "prestadores.db"
+# Não usamos mais SQLite local
+# DB_PATH = BASE_PATH / "prestadores.db"
 LOG_PATH = BASE_PATH / "notificacoes.log"
 
 # ====================== CORES UNIMED ======================
@@ -67,276 +76,118 @@ def formatar_data_entrada(texto: str) -> str | None:
     return None
 
 def get_db_connection():
-    """Retorna conexão com o banco (NeonDB ou SQLite)"""
-    if USAR_NEON and neon_db:
-        return neon_db.get_connection()
-    else:
-        return sqlite3.connect(str(DB_PATH))
+    """Retorna conexão com o banco (APENAS NeonDB)"""
+    return neon_db.get_connection()
 
 def return_db_connection(conn):
     """Devolve conexão ao pool (NeonDB)"""
-    if USAR_NEON and neon_db and conn:
+    if conn:
         neon_db.return_connection(conn)
 
 def init_app_db():
-    """Inicializa o banco de dados"""
-    if USAR_NEON and neon_db:
-        # NeonDB já cria as tabelas automaticamente
-        print("✅ Usando NeonDB - tabelas já verificadas")
-        return
-    
-    # SQLite
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS prestadores (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        codigo TEXT UNIQUE,
-        nome TEXT,
-        email TEXT,
-        data_cadastro DATE DEFAULT CURRENT_DATE,
-        tipo_prestador TEXT
-    )''')
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS datas_envio (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tipo_prestador TEXT,
-        referencia TEXT,
-        faturamento_inicio DATE,
-        faturamento_fim DATE,
-        recurso_inicio DATE,
-        recurso_fim DATE,
-        status TEXT DEFAULT 'Ativo'
-    )''')
-    
-    cursor.execute('''CREATE TABLE IF NOT EXISTS log_envios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data_envio DATETIME DEFAULT CURRENT_TIMESTAMP,
-        prestador_id INTEGER,
-        prestador_nome TEXT,
-        referencia TEXT,
-        tipo_conta TEXT,
-        tipo_notificacao TEXT,
-        sucesso INTEGER DEFAULT 1,
-        mensagem TEXT,
-        FOREIGN KEY (prestador_id) REFERENCES prestadores(id)
-    )''')
-    
-    conn.commit()
-    conn.close()
-    print("✅ Banco SQLite inicializado")
-
-# ====================== FUNÇÕES DE CONVERSÃO ======================
-def row_to_dict(columns, row):
-    """Converte uma linha do PostgreSQL para dicionário"""
-    return dict(zip(columns, row))
-
-def extract_row_data(row, columns):
-    """Extrai dados de uma linha (funciona com SQLite e NeonDB)"""
-    if USAR_NEON:
-        # Já é um dicionário
-        return row
-    else:
-        # É uma tupla, converter para dicionário
-        return row_to_dict(columns, row)
-
-# ====================== FUNÇÕES DE EXECUÇÃO DE QUERIES ======================
-def execute_query(query, params=None, fetch_one=False, fetch_all=False):
-    """Executa uma query no banco de dados atual"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        if USAR_NEON:
-            cursor.execute(query, params or ())
-        else:
-            # Converte placeholders do PostgreSQL para SQLite se necessário
-            sqlite_query = query.replace('%s', '?')
-            cursor.execute(sqlite_query, params or ())
-        
-        if fetch_one:
-            result = cursor.fetchone()
-            return result
-        elif fetch_all:
-            result = cursor.fetchall()
-            return result
-        else:
-            conn.commit()
-            return cursor.rowcount
-    finally:
-        return_db_connection(conn) if USAR_NEON else conn.close()
+    """Inicializa o banco de dados - NeonDB já cria as tabelas"""
+    print("✅ Usando NeonDB - tabelas já verificadas pelo notificador")
+    return
 
 # ====================== FUNÇÕES ESPECÍFICAS DO BANCO ======================
 def listar_prestadores(filtro=""):
     """Lista prestadores com filtro opcional"""
-    if USAR_NEON:
-        query = """
-            SELECT id, codigo, nome, email, tipo_prestador, data_cadastro 
-            FROM prestadores
-        """
-        params = []
-        
-        if filtro:
-            query += " WHERE LOWER(codigo) LIKE %s OR LOWER(nome) LIKE %s OR LOWER(email) LIKE %s"
-            termo = f"%{filtro}%"
-            params = [termo, termo, termo]
-        
-        query += " ORDER BY nome"
-        
-        conn = neon_db.get_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        neon_db.return_connection(conn)
-        return [(r['id'], r['codigo'], r['nome'], r['email'], r['tipo_prestador'], r['data_cadastro']) for r in results]
-    else:
-        conn = sqlite3.connect(str(DB_PATH))
-        cursor = conn.cursor()
-        query = "SELECT id, codigo, nome, email, tipo_prestador, data_cadastro FROM prestadores"
-        params = []
-        
-        if filtro:
-            query += " WHERE LOWER(codigo) LIKE ? OR LOWER(nome) LIKE ? OR LOWER(email) LIKE ?"
-            termo = f"%{filtro}%"
-            params = [termo, termo, termo]
-        
-        query += " ORDER BY nome"
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        conn.close()
-        return results
+    query = """
+        SELECT id, codigo, nome, email, tipo_prestador, data_cadastro 
+        FROM prestadores
+    """
+    params = []
+    
+    if filtro:
+        query += " WHERE LOWER(codigo) LIKE %s OR LOWER(nome) LIKE %s OR LOWER(email) LIKE %s"
+        termo = f"%{filtro}%"
+        params = [termo, termo, termo]
+    
+    query += " ORDER BY nome"
+    
+    conn = neon_db.get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+    neon_db.return_connection(conn)
+    return [(r['id'], r['codigo'], r['nome'], r['email'], r['tipo_prestador'], r['data_cadastro']) for r in results]
 
 def listar_datas_envio(filtro=""):
     """Lista períodos com filtro opcional"""
-    if USAR_NEON:
-        query = """
-            SELECT id, tipo_prestador, referencia, 
-                   faturamento_inicio, faturamento_fim, 
-                   recurso_inicio, recurso_fim, status 
-            FROM datas_envio
-        """
-        params = []
-        
-        if filtro:
-            query += " WHERE LOWER(tipo_prestador) LIKE %s OR LOWER(referencia) LIKE %s"
-            termo = f"%{filtro}%"
-            params = [termo, termo]
-        
-        query += " ORDER BY tipo_prestador, referencia DESC"
-        
-        conn = neon_db.get_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        neon_db.return_connection(conn)
-        return [(r['id'], r['tipo_prestador'], r['referencia'], 
-                r['faturamento_inicio'], r['faturamento_fim'],
-                r['recurso_inicio'], r['recurso_fim'], r['status']) for r in results]
-    else:
-        conn = sqlite3.connect(str(DB_PATH))
-        cursor = conn.cursor()
-        query = """SELECT id, tipo_prestador, referencia, 
-                         faturamento_inicio, faturamento_fim, 
-                         recurso_inicio, recurso_fim, status 
-                  FROM datas_envio"""
-        params = []
-        
-        if filtro:
-            query += " WHERE LOWER(tipo_prestador) LIKE ? OR LOWER(referencia) LIKE ?"
-            termo = f"%{filtro}%"
-            params = [termo, termo]
-        
-        query += " ORDER BY tipo_prestador, referencia DESC"
-        cursor.execute(query, params)
-        results = cursor.fetchall()
-        conn.close()
-        return results
+    query = """
+        SELECT id, tipo_prestador, referencia, 
+               faturamento_inicio, faturamento_fim, 
+               recurso_inicio, recurso_fim, status 
+        FROM datas_envio
+    """
+    params = []
+    
+    if filtro:
+        query += " WHERE LOWER(tipo_prestador) LIKE %s OR LOWER(referencia) LIKE %s"
+        termo = f"%{filtro}%"
+        params = [termo, termo]
+    
+    query += " ORDER BY tipo_prestador, referencia DESC"
+    
+    conn = neon_db.get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+    neon_db.return_connection(conn)
+    return [(r['id'], r['tipo_prestador'], r['referencia'], 
+            r['faturamento_inicio'], r['faturamento_fim'],
+            r['recurso_inicio'], r['recurso_fim'], r['status']) for r in results]
 
 def listar_log_envios(limite=100):
-    """Lista logs dos últimos envios"""
-    if USAR_NEON:
-        query = """
-            SELECT data_envio, prestador_nome, referencia, tipo_conta, 
-                   tipo_notificacao, sucesso 
-            FROM log_envios 
-            ORDER BY data_envio DESC LIMIT %s
-        """
-        conn = neon_db.get_connection()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(query, (limite,))
-        results = cursor.fetchall()
-        neon_db.return_connection(conn)
-        return [(r['data_envio'], r['prestador_nome'], r['referencia'], 
-                r['tipo_conta'], r['tipo_notificacao'], r['sucesso']) for r in results]
-    else:
-        conn = sqlite3.connect(str(DB_PATH))
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT data_envio, prestador_nome, referencia, tipo_conta, 
-                   tipo_notificacao, sucesso 
-            FROM log_envios 
-            ORDER BY data_envio DESC LIMIT ?
-        """, (limite,))
-        results = cursor.fetchall()
-        conn.close()
-        return results
+    """Lista logs dos últimos envios (adaptado para PostgreSQL)"""
+    query = """
+        SELECT data_envio, prestador_nome, referencia, tipo_conta, 
+               tipo_notificacao, sucesso 
+        FROM log_envios 
+        ORDER BY data_envio DESC LIMIT %s
+    """
+    conn = neon_db.get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute(query, (limite,))
+    results = cursor.fetchall()
+    neon_db.return_connection(conn)
+    
+    # Converte booleano PostgreSQL para int (para compatibilidade com o resto do código)
+    return [(r['data_envio'], r['prestador_nome'], r['referencia'], 
+            r['tipo_conta'], r['tipo_notificacao'], 1 if r['sucesso'] else 0) for r in results]
 
 def contar_prestadores():
     """Retorna total de prestadores"""
-    if USAR_NEON:
-        conn = neon_db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM prestadores")
-        result = cursor.fetchone()[0]
-        neon_db.return_connection(conn)
-        return result
-    else:
-        conn = sqlite3.connect(str(DB_PATH))
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM prestadores")
-        result = cursor.fetchone()[0]
-        conn.close()
-        return result
+    conn = neon_db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM prestadores")
+    result = cursor.fetchone()[0]
+    neon_db.return_connection(conn)
+    return result
 
 def contar_datas_ativas():
     """Retorna total de períodos ativos"""
-    if USAR_NEON:
-        conn = neon_db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM datas_envio WHERE status = 'Ativo'")
-        result = cursor.fetchone()[0]
-        neon_db.return_connection(conn)
-        return result
-    else:
-        conn = sqlite3.connect(str(DB_PATH))
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM datas_envio WHERE status = 'Ativo'")
-        result = cursor.fetchone()[0]
-        conn.close()
-        return result
+    conn = neon_db.get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM datas_envio WHERE status = 'Ativo'")
+    result = cursor.fetchone()[0]
+    neon_db.return_connection(conn)
+    return result
 
 def contar_falhas_7dias():
-    """Retorna falhas nos últimos 7 dias"""
-    if USAR_NEON:
-        conn = neon_db.get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT COUNT(*) FROM log_envios 
-            WHERE sucesso = 0 AND data_envio >= CURRENT_DATE - INTERVAL '7 days'
-        """)
-        result = cursor.fetchone()[0]
-        neon_db.return_connection(conn)
-        return result
-    else:
-        conn = sqlite3.connect(str(DB_PATH))
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT COUNT(*) FROM log_envios 
-            WHERE sucesso = 0 AND data_envio >= date('now', '-7 days')
-        """)
-        result = cursor.fetchone()[0]
-        conn.close()
-        return result
+    """Retorna falhas nos últimos 7 dias (adaptado para PostgreSQL)"""
+    conn = neon_db.get_connection()
+    cursor = conn.cursor()
+    
+    # Correção: PostgreSQL usa FALSE (booleano) em vez de 0
+    cursor.execute("""
+        SELECT COUNT(*) FROM log_envios 
+        WHERE sucesso = FALSE AND data_envio >= CURRENT_DATE - INTERVAL '7 days'
+    """)
+    
+    result = cursor.fetchone()[0]
+    neon_db.return_connection(conn)
+    return result
 
 # ====================== FUNÇÕES AUXILIARES DE UI ======================
 def criar_badge_status(status):
@@ -421,12 +272,13 @@ def main(page: ft.Page):
     page.window_height = 900
     page.expand = True
 
-    # Mostra qual banco está sendo usado
-    page.snack_bar = ft.SnackBar(
-        ft.Text(f"📦 Conectado ao: {'NeonDB (PostgreSQL)' if USAR_NEON else 'SQLite local'}"),
-        bgcolor=UNIMED_GREEN if USAR_NEON else ft.Colors.ORANGE_400
+    # Mostra qual banco está sendo usado (agora só NeonDB)
+    snack_bar = ft.SnackBar(
+        content=ft.Text("📦 Conectado ao NeonDB (PostgreSQL)"),
+        bgcolor=UNIMED_GREEN
     )
-    page.snack_bar.open = True
+    page.overlay.append(snack_bar)
+    snack_bar.open = True
     
     # Inicializa banco
     init_app_db()
@@ -636,48 +488,30 @@ def main(page: ft.Page):
         nonlocal editando_prestador_id
         
         if not all([txt_codigo.value, txt_nome.value, txt_email.value, dd_tipo_prestador.value]):
-            page.snack_bar = ft.SnackBar(ft.Text("Preencha todos os campos!"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text("Preencha todos os campos!"))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             return
 
         try:
-            if USAR_NEON:
-                conn = neon_db.get_connection()
-                cursor = conn.cursor()
-                
-                if editando_prestador_id:
-                    cursor.execute("""
-                        UPDATE prestadores SET codigo=%s, nome=%s, email=%s, tipo_prestador=%s
-                        WHERE id=%s
-                    """, (txt_codigo.value, txt_nome.value, txt_email.value, 
-                          dd_tipo_prestador.value, editando_prestador_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO prestadores (codigo, nome, email, tipo_prestador)
-                        VALUES (%s, %s, %s, %s)
-                    """, (txt_codigo.value, txt_nome.value, txt_email.value, dd_tipo_prestador.value))
-                
-                conn.commit()
-                neon_db.return_connection(conn)
+            conn = neon_db.get_connection()
+            cursor = conn.cursor()
+            
+            if editando_prestador_id:
+                cursor.execute("""
+                    UPDATE prestadores SET codigo=%s, nome=%s, email=%s, tipo_prestador=%s
+                    WHERE id=%s
+                """, (txt_codigo.value, txt_nome.value, txt_email.value, 
+                      dd_tipo_prestador.value, editando_prestador_id))
             else:
-                conn = sqlite3.connect(str(DB_PATH))
-                cursor = conn.cursor()
-                
-                if editando_prestador_id:
-                    cursor.execute("""
-                        UPDATE prestadores SET codigo=?, nome=?, email=?, tipo_prestador=?
-                        WHERE id=?
-                    """, (txt_codigo.value, txt_nome.value, txt_email.value, 
-                          dd_tipo_prestador.value, editando_prestador_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO prestadores (codigo, nome, email, tipo_prestador)
-                        VALUES (?, ?, ?, ?)
-                    """, (txt_codigo.value, txt_nome.value, txt_email.value, dd_tipo_prestador.value))
-                
-                conn.commit()
-                conn.close()
+                cursor.execute("""
+                    INSERT INTO prestadores (codigo, nome, email, tipo_prestador)
+                    VALUES (%s, %s, %s, %s)
+                """, (txt_codigo.value, txt_nome.value, txt_email.value, dd_tipo_prestador.value))
+            
+            conn.commit()
+            neon_db.return_connection(conn)
             
             # Feedback visual
             msg = "Prestador atualizado!" if editando_prestador_id else "Prestador cadastrado!"
@@ -687,15 +521,17 @@ def main(page: ft.Page):
             
             await asyncio.sleep(1.5)
             
-            page.snack_bar = ft.SnackBar(ft.Text(msg))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text(msg))
+            page.overlay.append(snack)
+            snack.open = True
             limpar_campos_prestador()
             atualizar_tabela_prestadores()
             atualizar_metricas()
             
         except Exception as ex:
-            page.snack_bar = ft.SnackBar(ft.Text(f"Erro: {str(ex)}"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text(f"Erro: {str(ex)}"))
+            page.overlay.append(snack)
+            snack.open = True
         finally:
             page.update()
 
@@ -703,8 +539,9 @@ def main(page: ft.Page):
         nonlocal editando_data_id
         
         if not all([dd_tipo_envio.value, txt_referencia.value]):
-            page.snack_bar = ft.SnackBar(ft.Text("Preencha tipo e referência!"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text("Preencha tipo e referência!"))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             return
 
@@ -735,56 +572,30 @@ def main(page: ft.Page):
                     rec_fim = d.strftime("%Y-%m-%d")
                 except: pass
 
-            if USAR_NEON:
-                conn = neon_db.get_connection()
-                cursor = conn.cursor()
-                
-                if editando_data_id:
-                    cursor.execute("""
-                        UPDATE datas_envio SET 
-                            tipo_prestador=%s, referencia=%s, 
-                            faturamento_inicio=%s, faturamento_fim=%s, 
-                            recurso_inicio=%s, recurso_fim=%s, status=%s 
-                        WHERE id=%s
-                    """, (dd_tipo_envio.value, txt_referencia.value, 
-                          fat_ini, fat_fim, rec_ini, rec_fim, 
-                          dd_status.value, editando_data_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO datas_envio 
-                        (tipo_prestador, referencia, faturamento_inicio, faturamento_fim,
-                         recurso_inicio, recurso_fim, status)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (dd_tipo_envio.value, txt_referencia.value, 
-                          fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value))
-                
-                conn.commit()
-                neon_db.return_connection(conn)
+            conn = neon_db.get_connection()
+            cursor = conn.cursor()
+            
+            if editando_data_id:
+                cursor.execute("""
+                    UPDATE datas_envio SET 
+                        tipo_prestador=%s, referencia=%s, 
+                        faturamento_inicio=%s, faturamento_fim=%s, 
+                        recurso_inicio=%s, recurso_fim=%s, status=%s 
+                    WHERE id=%s
+                """, (dd_tipo_envio.value, txt_referencia.value, 
+                      fat_ini, fat_fim, rec_ini, rec_fim, 
+                      dd_status.value, editando_data_id))
             else:
-                conn = sqlite3.connect(str(DB_PATH))
-                cursor = conn.cursor()
-                
-                if editando_data_id:
-                    cursor.execute("""
-                        UPDATE datas_envio SET 
-                            tipo_prestador=?, referencia=?, 
-                            faturamento_inicio=?, faturamento_fim=?, 
-                            recurso_inicio=?, recurso_fim=?, status=? 
-                        WHERE id=?
-                    """, (dd_tipo_envio.value, txt_referencia.value, 
-                          fat_ini, fat_fim, rec_ini, rec_fim, 
-                          dd_status.value, editando_data_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO datas_envio 
-                        (tipo_prestador, referencia, faturamento_inicio, faturamento_fim,
-                         recurso_inicio, recurso_fim, status)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (dd_tipo_envio.value, txt_referencia.value, 
-                          fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value))
-                
-                conn.commit()
-                conn.close()
+                cursor.execute("""
+                    INSERT INTO datas_envio 
+                    (tipo_prestador, referencia, faturamento_inicio, faturamento_fim,
+                     recurso_inicio, recurso_fim, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (dd_tipo_envio.value, txt_referencia.value, 
+                      fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value))
+            
+            conn.commit()
+            neon_db.return_connection(conn)
             
             # Feedback visual
             msg = "Datas atualizadas!" if editando_data_id else "Datas cadastradas!"
@@ -794,72 +605,52 @@ def main(page: ft.Page):
             
             await asyncio.sleep(1.5)
             
-            page.snack_bar = ft.SnackBar(ft.Text(msg))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text(msg))
+            page.overlay.append(snack)
+            snack.open = True
             limpar_campos_data()
             atualizar_tabela_datas()
             atualizar_metricas()
             
         except Exception as ex:
-            page.snack_bar = ft.SnackBar(ft.Text(f"Erro: {str(ex)}"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text(f"Erro: {str(ex)}"))
+            page.overlay.append(snack)
+            snack.open = True
         finally:
             page.update()
 
     def editar_prestador(id: int):
         nonlocal editando_prestador_id
         
-        if USAR_NEON:
-            conn = neon_db.get_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("SELECT codigo, nome, email, tipo_prestador FROM prestadores WHERE id = %s", (id,))
-            row = cursor.fetchone()
-            neon_db.return_connection(conn)
-            
-            if row:
-                editando_prestador_id = id
-                txt_codigo.value = row['codigo']
-                txt_nome.value = row['nome']
-                txt_email.value = row['email']
-                dd_tipo_prestador.value = row['tipo_prestador']
-                btn_salvar_prestador.text = "Atualizar Prestador"
-                page.update()
-        else:
-            conn = sqlite3.connect(str(DB_PATH))
-            cursor = conn.cursor()
-            cursor.execute("SELECT codigo, nome, email, tipo_prestador FROM prestadores WHERE id = ?", (id,))
-            row = cursor.fetchone()
-            conn.close()
-            
-            if row:
-                editando_prestador_id = id
-                txt_codigo.value = row[0]
-                txt_nome.value = row[1]
-                txt_email.value = row[2]
-                dd_tipo_prestador.value = row[3]
-                btn_salvar_prestador.text = "Atualizar Prestador"
-                page.update()
+        conn = neon_db.get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT codigo, nome, email, tipo_prestador FROM prestadores WHERE id = %s", (id,))
+        row = cursor.fetchone()
+        neon_db.return_connection(conn)
+        
+        if row:
+            editando_prestador_id = id
+            txt_codigo.value = row['codigo']
+            txt_nome.value = row['nome']
+            txt_email.value = row['email']
+            dd_tipo_prestador.value = row['tipo_prestador']
+            btn_salvar_prestador.text = "Atualizar Prestador"
+            page.update()
 
     def excluir_prestador(id: int):
         def confirmar(e):
-            if USAR_NEON:
-                conn = neon_db.get_connection()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM prestadores WHERE id = %s", (id,))
-                conn.commit()
-                neon_db.return_connection(conn)
-            else:
-                conn = sqlite3.connect(str(DB_PATH))
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM prestadores WHERE id = ?", (id,))
-                conn.commit()
-                conn.close()
+            conn = neon_db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM prestadores WHERE id = %s", (id,))
+            conn.commit()
+            neon_db.return_connection(conn)
             
             page.dialog.open = False
             atualizar_tabela_prestadores()
             atualizar_metricas()
-            page.snack_bar = ft.SnackBar(ft.Text("Prestador excluído!"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text("Prestador excluído!"))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
 
         page.dialog = ft.AlertDialog(
@@ -876,87 +667,50 @@ def main(page: ft.Page):
     def editar_data(id: int):
         nonlocal editando_data_id
         
-        if USAR_NEON:
-            conn = neon_db.get_connection()
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            cursor.execute("""SELECT tipo_prestador, referencia, faturamento_inicio, 
-                                    faturamento_fim, recurso_inicio, recurso_fim, status 
-                             FROM datas_envio WHERE id = %s""", (id,))
-            row = cursor.fetchone()
-            neon_db.return_connection(conn)
+        conn = neon_db.get_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""SELECT tipo_prestador, referencia, faturamento_inicio, 
+                                faturamento_fim, recurso_inicio, recurso_fim, status 
+                         FROM datas_envio WHERE id = %s""", (id,))
+        row = cursor.fetchone()
+        neon_db.return_connection(conn)
+        
+        if row:
+            editando_data_id = id
+            dd_tipo_envio.value = row['tipo_prestador']
+            txt_referencia.value = row['referencia']
             
-            if row:
-                editando_data_id = id
-                dd_tipo_envio.value = row['tipo_prestador']
-                txt_referencia.value = row['referencia']
-                
-                if row['faturamento_inicio']:
-                    d = datetime.strptime(str(row['faturamento_inicio']), "%Y-%m-%d").date()
-                    txt_fat_ini.value = d.strftime("%d/%m/%Y")
-                if row['faturamento_fim']:
-                    d = datetime.strptime(str(row['faturamento_fim']), "%Y-%m-%d").date()
-                    txt_fat_fim.value = d.strftime("%d/%m/%Y")
-                if row['recurso_inicio']:
-                    d = datetime.strptime(str(row['recurso_inicio']), "%Y-%m-%d").date()
-                    txt_rec_ini.value = d.strftime("%d/%m/%Y")
-                if row['recurso_fim']:
-                    d = datetime.strptime(str(row['recurso_fim']), "%Y-%m-%d").date()
-                    txt_rec_fim.value = d.strftime("%d/%m/%Y")
-                
-                dd_status.value = row['status']
-                btn_salvar_data.text = "Atualizar Datas"
-                page.update()
-        else:
-            conn = sqlite3.connect(str(DB_PATH))
-            cursor = conn.cursor()
-            cursor.execute("""SELECT tipo_prestador, referencia, faturamento_inicio, 
-                                    faturamento_fim, recurso_inicio, recurso_fim, status 
-                             FROM datas_envio WHERE id = ?""", (id,))
-            row = cursor.fetchone()
-            conn.close()
+            if row['faturamento_inicio']:
+                d = datetime.strptime(str(row['faturamento_inicio']), "%Y-%m-%d").date()
+                txt_fat_ini.value = d.strftime("%d/%m/%Y")
+            if row['faturamento_fim']:
+                d = datetime.strptime(str(row['faturamento_fim']), "%Y-%m-%d").date()
+                txt_fat_fim.value = d.strftime("%d/%m/%Y")
+            if row['recurso_inicio']:
+                d = datetime.strptime(str(row['recurso_inicio']), "%Y-%m-%d").date()
+                txt_rec_ini.value = d.strftime("%d/%m/%Y")
+            if row['recurso_fim']:
+                d = datetime.strptime(str(row['recurso_fim']), "%Y-%m-%d").date()
+                txt_rec_fim.value = d.strftime("%d/%m/%Y")
             
-            if row:
-                editando_data_id = id
-                dd_tipo_envio.value = row[0]
-                txt_referencia.value = row[1]
-                
-                if row[2]:
-                    d = datetime.strptime(row[2], "%Y-%m-%d").date()
-                    txt_fat_ini.value = d.strftime("%d/%m/%Y")
-                if row[3]:
-                    d = datetime.strptime(row[3], "%Y-%m-%d").date()
-                    txt_fat_fim.value = d.strftime("%d/%m/%Y")
-                if row[4]:
-                    d = datetime.strptime(row[4], "%Y-%m-%d").date()
-                    txt_rec_ini.value = d.strftime("%d/%m/%Y")
-                if row[5]:
-                    d = datetime.strptime(row[5], "%Y-%m-%d").date()
-                    txt_rec_fim.value = d.strftime("%d/%m/%Y")
-                
-                dd_status.value = row[6]
-                btn_salvar_data.text = "Atualizar Datas"
-                page.update()
+            dd_status.value = row['status']
+            btn_salvar_data.text = "Atualizar Datas"
+            page.update()
 
     def excluir_data(id: int):
         def confirmar(e):
-            if USAR_NEON:
-                conn = neon_db.get_connection()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM datas_envio WHERE id = %s", (id,))
-                conn.commit()
-                neon_db.return_connection(conn)
-            else:
-                conn = sqlite3.connect(str(DB_PATH))
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM datas_envio WHERE id = ?", (id,))
-                conn.commit()
-                conn.close()
+            conn = neon_db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM datas_envio WHERE id = %s", (id,))
+            conn.commit()
+            neon_db.return_connection(conn)
             
             page.dialog.open = False
             atualizar_tabela_datas()
             atualizar_metricas()
-            page.snack_bar = ft.SnackBar(ft.Text("Período excluído!"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text("Período excluído!"))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
 
         page.dialog = ft.AlertDialog(
@@ -972,10 +726,10 @@ def main(page: ft.Page):
 
     # ====================== FUNÇÃO DE TESTE DE E-MAIL ======================
     def testar_email(e):
-        """Função que testa o envio real de e-mail usando o notificador"""
         if notificador is None:
-            page.snack_bar = ft.SnackBar(ft.Text("❌ Notificador não disponível!"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text("❌ Notificador não disponível!"))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             return
         
@@ -983,38 +737,28 @@ def main(page: ft.Page):
         nome_teste = txt_nome.value if txt_nome.value else "Prestador Teste"
         
         if not email_teste:
-            # Tenta buscar do banco
-            if USAR_NEON:
-                conn = neon_db.get_connection()
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
-                cursor.execute("SELECT email, nome FROM prestadores WHERE email IS NOT NULL AND email != '' LIMIT 1")
-                result = cursor.fetchone()
-                neon_db.return_connection(conn)
-                if result:
-                    email_teste = result['email']
-                    nome_teste = result['nome']
-            else:
-                conn = sqlite3.connect(str(DB_PATH))
-                cursor = conn.cursor()
-                cursor.execute("SELECT email, nome FROM prestadores WHERE email IS NOT NULL AND email != '' LIMIT 1")
-                result = cursor.fetchone()
-                conn.close()
-                if result:
-                    email_teste = result[0]
-                    nome_teste = result[1]
+            conn = neon_db.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT email, nome FROM prestadores WHERE email IS NOT NULL AND email != '' LIMIT 1")
+            result = cursor.fetchone()
+            neon_db.return_connection(conn)
             
-            if not email_teste:
-                page.snack_bar = ft.SnackBar(ft.Text("❌ Nenhum e-mail disponível para teste!"))
-                page.snack_bar.open = True
+            if result:
+                email_teste = result['email']
+                nome_teste = result['nome']
+            else:
+                snack = ft.SnackBar(content=ft.Text("❌ Nenhum e-mail disponível para teste!"))
+                page.overlay.append(snack)
+                snack.open = True
                 page.update()
                 return
         
         try:
-            # Mostra loading
-            page.snack_bar = ft.SnackBar(ft.Text("⏳ Enviando e-mail de teste..."), open=True)
+            snack = ft.SnackBar(content=ft.Text("⏳ Enviando e-mail de teste..."))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             
-            # Cria e-mail de teste
             html = notificador.criar_card_email(
                 titulo="🔧 TESTE DO SISTEMA",
                 mensagem="Esta é uma mensagem de teste do sistema de notificações da Unimed RV.",
@@ -1032,40 +776,30 @@ def main(page: ft.Page):
             )
             
             if sucesso:
-                page.snack_bar = ft.SnackBar(ft.Text(f"✅ E-mail enviado para {email_teste}!"))
+                snack = ft.SnackBar(content=ft.Text(f"✅ E-mail enviado para {email_teste}!"))
                 
-                # Registra no log
-                if USAR_NEON:
-                    conn = neon_db.get_connection()
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        INSERT INTO log_envios 
-                        (prestador_id, prestador_nome, referencia, tipo_conta, tipo_notificacao, sucesso, mensagem)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """, (0, nome_teste, "Teste Manual", "Teste", "Teste_Manual", True, "Teste manual de e-mail"))
-                    conn.commit()
-                    neon_db.return_connection(conn)
-                else:
-                    conn = sqlite3.connect(str(DB_PATH))
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        INSERT INTO log_envios 
-                        (prestador_id, prestador_nome, referencia, tipo_conta, tipo_notificacao, sucesso, mensagem)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (0, nome_teste, "Teste Manual", "Teste", "Teste_Manual", 1, "Teste manual de e-mail"))
-                    conn.commit()
-                    conn.close()
+                conn = neon_db.get_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO log_envios 
+                    (prestador_id, prestador_nome, referencia, tipo_conta, tipo_notificacao, sucesso, mensagem)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (0, nome_teste, "Teste Manual", "Teste", "Teste_Manual", True, "Teste manual de e-mail"))
+                conn.commit()
+                neon_db.return_connection(conn)
                 
                 atualizar_tabela_log()
             else:
-                page.snack_bar = ft.SnackBar(ft.Text("❌ Falha no envio. Verifique configurações."))
+                snack = ft.SnackBar(content=ft.Text("❌ Falha no envio. Verifique configurações."))
             
-            page.snack_bar.open = True
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
             
         except Exception as ex:
-            page.snack_bar = ft.SnackBar(ft.Text(f"❌ Erro: {str(ex)}"))
-            page.snack_bar.open = True
+            snack = ft.SnackBar(content=ft.Text(f"❌ Erro: {str(ex)}"))
+            page.overlay.append(snack)
+            snack.open = True
             page.update()
 
     # ====================== FUNÇÕES DE FILTRO ======================
@@ -1092,10 +826,7 @@ def main(page: ft.Page):
         
         tabela_prestadores.rows.clear()
         for row in results:
-            if USAR_NEON:
-                id_, codigo, nome, email, tipo, data_cad = row
-            else:
-                id_, codigo, nome, email, tipo, data_cad = row
+            id_, codigo, nome, email, tipo, data_cad = row
             
             tabela_prestadores.rows.append(
                 ft.DataRow(cells=[
@@ -1130,18 +861,13 @@ def main(page: ft.Page):
         hoje = date.today()
         
         for row in results:
-            if USAR_NEON:
-                id_, tipo, ref, fat_ini, fat_fim, rec_ini, rec_fim, status = row
-            else:
-                id_, tipo, ref, fat_ini, fat_fim, rec_ini, rec_fim, status = row
+            id_, tipo, ref, fat_ini, fat_fim, rec_ini, rec_fim, status = row
             
-            # Formata datas
             fat_ini_str = datetime.strptime(str(fat_ini), "%Y-%m-%d").strftime("%d/%m/%Y") if fat_ini else "-"
             fat_fim_str = datetime.strptime(str(fat_fim), "%Y-%m-%d").strftime("%d/%m/%Y") if fat_fim else "-"
             rec_ini_str = datetime.strptime(str(rec_ini), "%Y-%m-%d").strftime("%d/%m/%Y") if rec_ini else "-"
             rec_fim_str = datetime.strptime(str(rec_fim), "%Y-%m-%d").strftime("%d/%m/%Y") if rec_fim else "-"
             
-            # Destaca datas próximas do vencimento
             if fat_fim and datetime.strptime(str(fat_fim), "%Y-%m-%d").date() > hoje:
                 dias_restantes = (datetime.strptime(str(fat_fim), "%Y-%m-%d").date() - hoje).days
                 if dias_restantes <= 5:
@@ -1180,10 +906,7 @@ def main(page: ft.Page):
         
         tabela_log.rows.clear()
         for row in results:
-            if USAR_NEON:
-                data, prestador, ref, tipo_conta, notif, sucesso = row
-            else:
-                data, prestador, ref, tipo_conta, notif, sucesso = row
+            data, prestador, ref, tipo_conta, notif, sucesso = row
             
             tabela_log.rows.append(
                 ft.DataRow(cells=[
@@ -1257,7 +980,6 @@ def main(page: ft.Page):
     # ====================== CARDS DE MÉTRICAS ======================
     metricas_row = ft.ResponsiveRow([])
     
-    # Atualiza métricas iniciais
     total_prest, datas_ativas, falhas = calcular_metricas()
     metricas_row.controls.extend([
         criar_card_metrica("Prestadores", total_prest, ft.Colors.BLUE_400, ft.Icons.PEOPLE),
@@ -1338,14 +1060,7 @@ def main(page: ft.Page):
                     tooltip="Atualizar",
                     on_click=lambda e: atualizar_tabela_log()
                 ),
-                ft.ElevatedButton(
-                    text="Testar E-mail",
-                    icon=ft.Icons.EMAIL,
-                    on_click=testar_email,
-                    bgcolor=ft.Colors.ORANGE_400,
-                    color="white",
-                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
-                ),
+                btn_testar_email,
             ]),
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
         criar_quadro_tabela(tabela_log),

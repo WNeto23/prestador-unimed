@@ -395,23 +395,18 @@ END:VCALENDAR"""
             return False
 
     def registrar_log(self, cursor, prest_id: int, nome: str, ref: str,
-                      tipo_conta: str, tipo_notif: str, mensagem: str, sucesso: int = 1):
-        """Registra envio no banco (compatível com SQLite e PostgreSQL)"""
+                  tipo_conta: str, tipo_notif: str, mensagem: str, sucesso: int = 1):
+        """Registra envio no banco (adaptado para PostgreSQL)"""
         try:
-            if USAR_NEON:
-                cursor.execute("""
-                    INSERT INTO log_envios 
-                    (prestador_id, prestador_nome, referencia, tipo_conta,
-                     tipo_notificacao, sucesso, mensagem)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (prest_id, nome, ref, tipo_conta, tipo_notif, sucesso, mensagem[:800]))
-            else:
-                cursor.execute("""
-                    INSERT INTO log_envios 
-                    (prestador_id, prestador_nome, referencia, tipo_conta,
-                     tipo_notificacao, sucesso, mensagem)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (prest_id, nome, ref, tipo_conta, tipo_notif, sucesso, mensagem[:800]))
+            # Converte int (1/0) para booleano PostgreSQL (TRUE/FALSE)
+            sucesso_bool = True if sucesso == 1 else False
+            
+            cursor.execute("""
+                INSERT INTO log_envios 
+                (prestador_id, prestador_nome, referencia, tipo_conta,
+                tipo_notificacao, sucesso, mensagem)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (prest_id, nome, ref, tipo_conta, tipo_notif, sucesso_bool, mensagem[:800]))
         except Exception as e:
             logger.error(f"Erro ao registrar log: {e}")
 
