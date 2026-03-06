@@ -421,14 +421,22 @@ END:VCALENDAR"""
             logger.error(f"Erro ao registrar log: {e}")
 
     def processar_periodo(self, prest_id: int, nome: str, email: str, ref: str,
-                          tipo_conta: str, data_inicio_str: str, data_fim_str: str,
+                          tipo_conta: str, data_inicio_str, data_fim_str,
                           hoje: date, cursor) -> list:
         """Processa notificações para um período específico"""
         notificacoes = []
 
         try:
-            data_inicio = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
-            data_fim = datetime.strptime(data_fim_str, '%Y-%m-%d').date()
+            # PostgreSQL já retorna datetime.date — aceita os dois formatos
+            if isinstance(data_inicio_str, date):
+                data_inicio = data_inicio_str
+            else:
+                data_inicio = datetime.strptime(str(data_inicio_str), '%Y-%m-%d').date()
+
+            if isinstance(data_fim_str, date):
+                data_fim = data_fim_str
+            else:
+                data_fim = datetime.strptime(str(data_fim_str), '%Y-%m-%d').date()
         except Exception as e:
             logger.warning(f"Data inválida para {ref} - {tipo_conta}: {e}")
             return notificacoes
