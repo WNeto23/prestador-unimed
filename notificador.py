@@ -570,7 +570,7 @@ END:VCALENDAR"""
                 SELECT p.id, p.nome, p.email, p.tipo_prestador,
                        d.referencia, d.faturamento_inicio, d.faturamento_fim,
                        d.recurso_inicio, d.recurso_fim,
-                       d.guia_fisica_1, d.guia_fisica_2, d.guia_fisica_3, d.guia_fisica_4
+                       d.guia_fisica_1, d.guia_fisica_2, d.guia_fisica_3, d.guia_fisica_4, d.guia_fisica_5
                 FROM prestadores p
                 JOIN datas_envio d ON p.tipo_prestador = d.tipo_prestador
                 WHERE d.status = 'Ativo'
@@ -600,7 +600,7 @@ END:VCALENDAR"""
                 rec_ini = row['recurso_inicio']
                 rec_fim = row['recurso_fim']
                 guias = [row.get('guia_fisica_1'), row.get('guia_fisica_2'),
-                         row.get('guia_fisica_3'), row.get('guia_fisica_4')]
+                         row.get('guia_fisica_3'), row.get('guia_fisica_4'), row.get('guia_fisica_5')]
                 guias = [g for g in guias if g]  # remove None
             else:
                 prest_id, nome, email, _, ref, fat_ini, fat_fim, rec_ini, rec_fim, *_ = row

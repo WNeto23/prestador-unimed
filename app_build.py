@@ -366,15 +366,19 @@ def main(page: ft.Page):
         border_color=ft.Colors.BLUE_400, dense=True
     )
     txt_guia2 = ft.TextField(
-        label="Entrega 2ª Data", hint_text="10/03/2026",
+        label="Entrega 2ª Data", hint_text="09/03/2026",
         border_color=ft.Colors.BLUE_400, dense=True
     )
     txt_guia3 = ft.TextField(
-        label="Entrega 3ª Data", hint_text="20/03/2026",
+        label="Entrega 3ª Data", hint_text="16/03/2026",
         border_color=ft.Colors.BLUE_400, dense=True
     )
     txt_guia4 = ft.TextField(
-        label="Entrega 4ª Data (último dia)", hint_text="27/03/2026",
+        label="Entrega 4ª Data", hint_text="20/03/2026",
+        border_color=ft.Colors.BLUE_400, dense=True
+    )
+    txt_guia5 = ft.TextField(
+        label="Entrega 5ª Data", hint_text="27/03/2026",
         border_color=ft.Colors.BLUE_400, dense=True
     )
 
@@ -412,7 +416,7 @@ def main(page: ft.Page):
         campo.update()
 
     for campo in [txt_fat_ini, txt_fat_fim, txt_rec_ini, txt_rec_fim,
-                  txt_guia1, txt_guia2, txt_guia3, txt_guia4]:
+                  txt_guia1, txt_guia2, txt_guia3, txt_guia4, txt_guia5]:
         campo.on_blur = on_blur_data
 
     # ====================== TABELAS ======================
@@ -483,6 +487,7 @@ def main(page: ft.Page):
         txt_guia2.value = ""
         txt_guia3.value = ""
         txt_guia4.value = ""
+        txt_guia5.value = ""
         dd_status.value = "Ativo"
         editando_data_id = None
         btn_salvar_data.text = "Salvar Datas"
@@ -552,7 +557,7 @@ def main(page: ft.Page):
 
         try:
             fat_ini = None; fat_fim = None; rec_ini = None; rec_fim = None
-            guia1 = None; guia2 = None; guia3 = None; guia4 = None
+            guia1 = None; guia2 = None; guia3 = None; guia4 = None; guia5 = None
 
             def parse_data(campo):
                 if campo.value:
@@ -569,6 +574,7 @@ def main(page: ft.Page):
             guia2   = parse_data(txt_guia2)
             guia3   = parse_data(txt_guia3)
             guia4   = parse_data(txt_guia4)
+            guia5   = parse_data(txt_guia5)
 
             conn = neon_db.get_connection()
             cursor = conn.cursor()
@@ -580,21 +586,21 @@ def main(page: ft.Page):
                         faturamento_inicio=%s, faturamento_fim=%s, 
                         recurso_inicio=%s, recurso_fim=%s, status=%s,
                         guia_fisica_1=%s, guia_fisica_2=%s,
-                        guia_fisica_3=%s, guia_fisica_4=%s
+                        guia_fisica_3=%s, guia_fisica_4=%s, guia_fisica_5=%s
                     WHERE id=%s
                 """, (dd_tipo_envio.value, txt_referencia.value,
                       fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value,
-                      guia1, guia2, guia3, guia4, editando_data_id))
+                      guia1, guia2, guia3, guia4, guia5, editando_data_id))
             else:
                 cursor.execute("""
                     INSERT INTO datas_envio 
                     (tipo_prestador, referencia, faturamento_inicio, faturamento_fim,
                      recurso_inicio, recurso_fim, status,
-                     guia_fisica_1, guia_fisica_2, guia_fisica_3, guia_fisica_4)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     guia_fisica_1, guia_fisica_2, guia_fisica_3, guia_fisica_4, guia_fisica_5)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (dd_tipo_envio.value, txt_referencia.value,
                       fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value,
-                      guia1, guia2, guia3, guia4))
+                      guia1, guia2, guia3, guia4, guia5))
             
             conn.commit()
             neon_db.return_connection(conn)
@@ -640,19 +646,26 @@ def main(page: ft.Page):
 
     def excluir_prestador(id: int):
         def confirmar(e):
-            conn = neon_db.get_connection()
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM prestadores WHERE id = %s", (id,))
-            conn.commit()
-            neon_db.return_connection(conn)
-            
-            page.dialog.open = False
-            atualizar_tabela_prestadores()
-            atualizar_metricas()
-            snack = ft.SnackBar(content=ft.Text("Prestador excluído!"))
-            page.overlay.append(snack)
-            snack.open = True
-            page.update()
+            try:
+                conn = neon_db.get_connection()
+                cursor = conn.cursor()
+                # Apaga logs do prestador primeiro (foreign key)
+                cursor.execute("DELETE FROM log_envios WHERE prestador_id = %s", (id,))
+                cursor.execute("DELETE FROM prestadores WHERE id = %s", (id,))
+                conn.commit()
+                neon_db.return_connection(conn)
+                page.dialog.open = False
+                atualizar_tabela_prestadores()
+                atualizar_metricas()
+                snack = ft.SnackBar(content=ft.Text("✅ Prestador excluído!"))
+                page.overlay.append(snack)
+                snack.open = True
+            except Exception as ex:
+                snack = ft.SnackBar(content=ft.Text(f"❌ Erro: {str(ex)}"))
+                page.overlay.append(snack)
+                snack.open = True
+            finally:
+                page.update()
 
         dlg = ft.AlertDialog(
             title=ft.Text("Confirmar exclusão"),
@@ -674,7 +687,7 @@ def main(page: ft.Page):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""SELECT tipo_prestador, referencia, faturamento_inicio, 
                                 faturamento_fim, recurso_inicio, recurso_fim, status,
-                                guia_fisica_1, guia_fisica_2, guia_fisica_3, guia_fisica_4
+                                guia_fisica_1, guia_fisica_2, guia_fisica_3, guia_fisica_4, guia_fisica_5
                          FROM datas_envio WHERE id = %s""", (id,))
         row = cursor.fetchone()
         neon_db.return_connection(conn)
@@ -698,6 +711,7 @@ def main(page: ft.Page):
             txt_guia2.value   = fmt(row['guia_fisica_2'])
             txt_guia3.value   = fmt(row['guia_fisica_3'])
             txt_guia4.value   = fmt(row['guia_fisica_4'])
+            txt_guia5.value   = fmt(row['guia_fisica_5'])
             dd_status.value = row['status']
             btn_salvar_data.text = "Atualizar Datas"
             page.update()
@@ -1052,6 +1066,7 @@ def main(page: ft.Page):
                     ft.Column([txt_guia2], col={"sm": 6, "md": 3}),
                     ft.Column([txt_guia3], col={"sm": 6, "md": 3}),
                     ft.Column([txt_guia4], col={"sm": 6, "md": 3}),
+                    ft.Column([txt_guia5], col={"sm": 6, "md": 3}),
                 ]),
                 ft.ResponsiveRow([
                     ft.Column([btn_salvar_data], col={"sm": 6, "md": 3}),

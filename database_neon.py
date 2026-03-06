@@ -78,6 +78,7 @@ class NeonDatabase:
                     guia_fisica_2 DATE,
                     guia_fisica_3 DATE,
                     guia_fisica_4 DATE,
+                    guia_fisica_5 DATE,
                     UNIQUE(tipo_prestador, referencia)
                 )
             """)
