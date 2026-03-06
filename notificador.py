@@ -289,7 +289,7 @@ END:VCALENDAR"""
 
     def criar_card_email(self, titulo: str, mensagem: str, prestador: str,
                         referencia: str, tipo_conta: str, data_fim: date = None,
-                        dias_restantes: int = None) -> str:
+                        dias_restantes: int = None, guias_fisicas: list = None) -> str:
         """Renderiza template HTML com os dados e logo online"""
         
         # Define cores baseado no tipo de conta
@@ -335,6 +335,17 @@ END:VCALENDAR"""
                 cor_botao = "#F57C00"
         
         # Renderiza template com a logo online
+        # Monta lista de datas de guias físicas formatadas para o template
+        guias_fmt = []
+        for g in (guias_fisicas or []):
+            if isinstance(g, date):
+                guias_fmt.append(g.strftime("%d/%m/%Y"))
+            else:
+                try:
+                    guias_fmt.append(datetime.strptime(str(g), "%Y-%m-%d").strftime("%d/%m/%Y"))
+                except:
+                    pass
+
         return self.template_html.render(
             logo_url=self.logo_url,
             cor_borda=cor_borda,
@@ -350,6 +361,7 @@ END:VCALENDAR"""
             dias_restantes=dias_restantes,
             mensagem=mensagem,
             msg_especifica=msg_especifica,
+            guias_fisicas=guias_fmt,
             url_portal=self.url_portal,
             email_contato=self.email_contato
         )
@@ -422,7 +434,7 @@ END:VCALENDAR"""
 
     def processar_periodo(self, prest_id: int, nome: str, email: str, ref: str,
                           tipo_conta: str, data_inicio_str, data_fim_str,
-                          hoje: date, cursor) -> list:
+                          hoje: date, cursor, guias: list = None) -> list:
         """Processa notificações para um período específico"""
         notificacoes = []
 
@@ -504,7 +516,8 @@ END:VCALENDAR"""
                 referencia=ref,
                 tipo_conta=tipo_conta,
                 data_fim=data_fim,
-                dias_restantes=dias_para_fim if dias_para_fim > 0 else None
+                dias_restantes=dias_para_fim if dias_para_fim > 0 else None,
+                guias_fisicas=guias or []
             )
 
             enviado = self.enviar_email(
@@ -545,7 +558,8 @@ END:VCALENDAR"""
             cursor.execute("""
                 SELECT p.id, p.nome, p.email, p.tipo_prestador,
                        d.referencia, d.faturamento_inicio, d.faturamento_fim,
-                       d.recurso_inicio, d.recurso_fim
+                       d.recurso_inicio, d.recurso_fim,
+                       d.guia_fisica_1, d.guia_fisica_2, d.guia_fisica_3, d.guia_fisica_4
                 FROM prestadores p
                 JOIN datas_envio d ON p.tipo_prestador = d.tipo_prestador
                 WHERE d.status = 'Ativo'
@@ -554,7 +568,8 @@ END:VCALENDAR"""
             cursor.execute("""
                 SELECT p.id, p.nome, p.email, p.tipo_prestador,
                        d.referencia, d.faturamento_inicio, d.faturamento_fim,
-                       d.recurso_inicio, d.recurso_fim
+                       d.recurso_inicio, d.recurso_fim,
+                       NULL, NULL, NULL, NULL
                 FROM prestadores p
                 JOIN datas_envio d ON p.tipo_prestador = d.tipo_prestador
                 WHERE d.status = 'Ativo'
@@ -564,7 +579,6 @@ END:VCALENDAR"""
         logger.info(f"📊 Encontrados {len(registros)} prestadores ativos")
         
         for idx, row in enumerate(registros):
-            # Extrai dados (compatível com dict do PostgreSQL ou tuple do SQLite)
             if USAR_NEON:
                 prest_id = row['id']
                 nome = row['nome']
@@ -574,8 +588,12 @@ END:VCALENDAR"""
                 fat_fim = row['faturamento_fim']
                 rec_ini = row['recurso_inicio']
                 rec_fim = row['recurso_fim']
+                guias = [row.get('guia_fisica_1'), row.get('guia_fisica_2'),
+                         row.get('guia_fisica_3'), row.get('guia_fisica_4')]
+                guias = [g for g in guias if g]  # remove None
             else:
-                prest_id, nome, email, _, ref, fat_ini, fat_fim, rec_ini, rec_fim = row
+                prest_id, nome, email, _, ref, fat_ini, fat_fim, rec_ini, rec_fim, *_ = row
+                guias = []
             
             # Valida e-mail
             if not self.is_email_valido(email):
@@ -588,7 +606,7 @@ END:VCALENDAR"""
             if fat_ini and fat_fim:
                 enviadas = self.processar_periodo(
                     prest_id, nome, email, ref, "Faturamento Contas",
-                    fat_ini, fat_fim, hoje, cursor
+                    fat_ini, fat_fim, hoje, cursor, guias
                 )
                 notificacoes_enviadas.extend(enviadas)
             
@@ -596,8 +614,9 @@ END:VCALENDAR"""
             if rec_ini and rec_fim:
                 enviadas = self.processar_periodo(
                     prest_id, nome, email, ref, "Recurso de Glosas",
-                    rec_ini, rec_fim, hoje, cursor
+                    rec_ini, rec_fim, hoje, cursor, guias
                 )
+                notificacoes_enviadas.extend(enviadas)
                 notificacoes_enviadas.extend(enviadas)
             
             # Delay entre prestadores para evitar bloqueio

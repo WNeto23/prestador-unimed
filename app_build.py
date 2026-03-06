@@ -360,6 +360,24 @@ def main(page: ft.Page):
         dense=True
     )
 
+    # ====================== CAMPOS GUIAS FÍSICAS ======================
+    txt_guia1 = ft.TextField(
+        label="Entrega 1ª Data", hint_text="02/03/2026",
+        border_color=ft.Colors.BLUE_400, dense=True
+    )
+    txt_guia2 = ft.TextField(
+        label="Entrega 2ª Data", hint_text="10/03/2026",
+        border_color=ft.Colors.BLUE_400, dense=True
+    )
+    txt_guia3 = ft.TextField(
+        label="Entrega 3ª Data", hint_text="20/03/2026",
+        border_color=ft.Colors.BLUE_400, dense=True
+    )
+    txt_guia4 = ft.TextField(
+        label="Entrega 4ª Data (último dia)", hint_text="27/03/2026",
+        border_color=ft.Colors.BLUE_400, dense=True
+    )
+
     # ====================== CAMPOS DE FILTRO ======================
     txt_filtro_prestadores = ft.TextField(
         label="Filtrar prestadores...",
@@ -393,7 +411,8 @@ def main(page: ft.Page):
             campo.error_text = None
         campo.update()
 
-    for campo in [txt_fat_ini, txt_fat_fim, txt_rec_ini, txt_rec_fim]:
+    for campo in [txt_fat_ini, txt_fat_fim, txt_rec_ini, txt_rec_fim,
+                  txt_guia1, txt_guia2, txt_guia3, txt_guia4]:
         campo.on_blur = on_blur_data
 
     # ====================== TABELAS ======================
@@ -460,6 +479,10 @@ def main(page: ft.Page):
         txt_fat_fim.value = ""
         txt_rec_ini.value = ""
         txt_rec_fim.value = ""
+        txt_guia1.value = ""
+        txt_guia2.value = ""
+        txt_guia3.value = ""
+        txt_guia4.value = ""
         dd_status.value = "Ativo"
         editando_data_id = None
         btn_salvar_data.text = "Salvar Datas"
@@ -529,30 +552,23 @@ def main(page: ft.Page):
 
         try:
             fat_ini = None; fat_fim = None; rec_ini = None; rec_fim = None
+            guia1 = None; guia2 = None; guia3 = None; guia4 = None
 
-            if txt_fat_ini.value:
-                try:
-                    d = datetime.strptime(txt_fat_ini.value, "%d/%m/%Y").date()
-                    fat_ini = d.strftime("%Y-%m-%d")
-                except: pass
+            def parse_data(campo):
+                if campo.value:
+                    try:
+                        return datetime.strptime(campo.value, "%d/%m/%Y").date().strftime("%Y-%m-%d")
+                    except: pass
+                return None
 
-            if txt_fat_fim.value:
-                try:
-                    d = datetime.strptime(txt_fat_fim.value, "%d/%m/%Y").date()
-                    fat_fim = d.strftime("%Y-%m-%d")
-                except: pass
-
-            if txt_rec_ini.value:
-                try:
-                    d = datetime.strptime(txt_rec_ini.value, "%d/%m/%Y").date()
-                    rec_ini = d.strftime("%Y-%m-%d")
-                except: pass
-
-            if txt_rec_fim.value:
-                try:
-                    d = datetime.strptime(txt_rec_fim.value, "%d/%m/%Y").date()
-                    rec_fim = d.strftime("%Y-%m-%d")
-                except: pass
+            fat_ini = parse_data(txt_fat_ini)
+            fat_fim = parse_data(txt_fat_fim)
+            rec_ini = parse_data(txt_rec_ini)
+            rec_fim = parse_data(txt_rec_fim)
+            guia1   = parse_data(txt_guia1)
+            guia2   = parse_data(txt_guia2)
+            guia3   = parse_data(txt_guia3)
+            guia4   = parse_data(txt_guia4)
 
             conn = neon_db.get_connection()
             cursor = conn.cursor()
@@ -562,19 +578,23 @@ def main(page: ft.Page):
                     UPDATE datas_envio SET 
                         tipo_prestador=%s, referencia=%s, 
                         faturamento_inicio=%s, faturamento_fim=%s, 
-                        recurso_inicio=%s, recurso_fim=%s, status=%s 
+                        recurso_inicio=%s, recurso_fim=%s, status=%s,
+                        guia_fisica_1=%s, guia_fisica_2=%s,
+                        guia_fisica_3=%s, guia_fisica_4=%s
                     WHERE id=%s
-                """, (dd_tipo_envio.value, txt_referencia.value, 
-                      fat_ini, fat_fim, rec_ini, rec_fim, 
-                      dd_status.value, editando_data_id))
+                """, (dd_tipo_envio.value, txt_referencia.value,
+                      fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value,
+                      guia1, guia2, guia3, guia4, editando_data_id))
             else:
                 cursor.execute("""
                     INSERT INTO datas_envio 
                     (tipo_prestador, referencia, faturamento_inicio, faturamento_fim,
-                     recurso_inicio, recurso_fim, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (dd_tipo_envio.value, txt_referencia.value, 
-                      fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value))
+                     recurso_inicio, recurso_fim, status,
+                     guia_fisica_1, guia_fisica_2, guia_fisica_3, guia_fisica_4)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (dd_tipo_envio.value, txt_referencia.value,
+                      fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value,
+                      guia1, guia2, guia3, guia4))
             
             conn.commit()
             neon_db.return_connection(conn)
@@ -651,29 +671,31 @@ def main(page: ft.Page):
         conn = neon_db.get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""SELECT tipo_prestador, referencia, faturamento_inicio, 
-                                faturamento_fim, recurso_inicio, recurso_fim, status 
+                                faturamento_fim, recurso_inicio, recurso_fim, status,
+                                guia_fisica_1, guia_fisica_2, guia_fisica_3, guia_fisica_4
                          FROM datas_envio WHERE id = %s""", (id,))
         row = cursor.fetchone()
         neon_db.return_connection(conn)
         
+        def fmt(val):
+            if val:
+                if isinstance(val, date):
+                    return val.strftime("%d/%m/%Y")
+                return datetime.strptime(str(val), "%Y-%m-%d").strftime("%d/%m/%Y")
+            return ""
+
         if row:
             editando_data_id = id
             dd_tipo_envio.value = row['tipo_prestador']
             txt_referencia.value = row['referencia']
-            
-            if row['faturamento_inicio']:
-                d = datetime.strptime(str(row['faturamento_inicio']), "%Y-%m-%d").date()
-                txt_fat_ini.value = d.strftime("%d/%m/%Y")
-            if row['faturamento_fim']:
-                d = datetime.strptime(str(row['faturamento_fim']), "%Y-%m-%d").date()
-                txt_fat_fim.value = d.strftime("%d/%m/%Y")
-            if row['recurso_inicio']:
-                d = datetime.strptime(str(row['recurso_inicio']), "%Y-%m-%d").date()
-                txt_rec_ini.value = d.strftime("%d/%m/%Y")
-            if row['recurso_fim']:
-                d = datetime.strptime(str(row['recurso_fim']), "%Y-%m-%d").date()
-                txt_rec_fim.value = d.strftime("%d/%m/%Y")
-            
+            txt_fat_ini.value = fmt(row['faturamento_inicio'])
+            txt_fat_fim.value = fmt(row['faturamento_fim'])
+            txt_rec_ini.value = fmt(row['recurso_inicio'])
+            txt_rec_fim.value = fmt(row['recurso_fim'])
+            txt_guia1.value   = fmt(row['guia_fisica_1'])
+            txt_guia2.value   = fmt(row['guia_fisica_2'])
+            txt_guia3.value   = fmt(row['guia_fisica_3'])
+            txt_guia4.value   = fmt(row['guia_fisica_4'])
             dd_status.value = row['status']
             btn_salvar_data.text = "Atualizar Datas"
             page.update()
@@ -1014,6 +1036,18 @@ def main(page: ft.Page):
                 ft.ResponsiveRow([
                     ft.Column([txt_rec_ini], col={"sm": 6, "md": 3}),
                     ft.Column([txt_rec_fim], col={"sm": 6, "md": 3}),
+                ]),
+                ft.Divider(color=ft.Colors.BLUE_400, height=16),
+                ft.Row([
+                    ft.Icon(ft.Icons.LOCAL_SHIPPING, color=ft.Colors.BLUE_400, size=18),
+                    ft.Text("Entrega de Guias Físicas na Operadora", size=16, 
+                            weight=ft.FontWeight.BOLD, color=ft.Colors.BLUE_400),
+                ]),
+                ft.ResponsiveRow([
+                    ft.Column([txt_guia1], col={"sm": 6, "md": 3}),
+                    ft.Column([txt_guia2], col={"sm": 6, "md": 3}),
+                    ft.Column([txt_guia3], col={"sm": 6, "md": 3}),
+                    ft.Column([txt_guia4], col={"sm": 6, "md": 3}),
                 ]),
                 ft.ResponsiveRow([
                     ft.Column([btn_salvar_data], col={"sm": 6, "md": 3}),

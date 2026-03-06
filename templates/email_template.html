@@ -10,10 +10,10 @@
         <tr>
             <td style="background: {{ cor_fundo }}; padding: 15px 20px; text-align: center; border-bottom: 3px solid {{ cor_borda }};">
                 <!-- Logo com fallback para teste local -->
-                <img src="cid:logo_unimed" 
+                <img src="{{ logo_url }}" 
                      alt="Unimed RV" 
                      style="height: 40px; width: auto; margin-bottom: 8px; display: inline-block;"
-                     onerror="this.onerror=null; this.src='https://www.unimed.coop.br/image/libraries/logo-unimed.png'; this.style.height='40px';">
+                     onerror="this.style.display='none'">
                 
                 <div style="background: {{ cor_borda }}; color: white; padding: 6px 12px; border-radius: 20px; display: inline-block; font-size: 13px; font-weight: bold; margin-top: 8px;">
                     {{ tipo_display }}
@@ -65,6 +65,29 @@
                     {{ msg_especifica | safe }}
                 </div>
                 {% endif %}
+
+                <!-- DATAS DE ENTREGA DE GUIAS FÍSICAS -->
+                {% if guias_fisicas %}
+                <div style="margin:15px 0; padding:15px; background:#e3f2fd; border-left:4px solid #1976D2; border-radius:6px;">
+                    <p style="margin:0 0 10px 0; font-weight:bold; color:#1976D2; font-size:14px;">
+                        📦 Datas de Entrega de Guias Físicas na Operadora
+                    </p>
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                        <tr>
+                            {% for data in guias_fisicas %}
+                            <td style="text-align:center; padding:4px 6px;">
+                                <span style="background:#1976D2; color:white; padding:5px 12px; border-radius:20px; font-size:13px; font-weight:bold; display:inline-block;">
+                                    {{ data }}
+                                </span>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                    </table>
+                    <p style="margin:10px 0 0 0; font-size:11px; color:#555;">
+                        ⚠️ A entrega de guias físicas na operadora <strong>só é aceita nestas datas</strong>. Fora delas não será possível realizar a entrega.
+                    </p>
+                </div>
+                {% endif %}
                 
                 <!-- BOTÃO DE AÇÃO -->
                 <div style="text-align: center; margin: 25px 0;">
@@ -78,7 +101,7 @@
                               display: inline-block;
                               box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                               font-size: 15px;">
-                        🚀 ACESSAR PORTAL DO PRESTADOR
+                        🌐 ACESSAR PORTAL DO PRESTADOR
                     </a>
                     <p style="font-size: 11px; color: #666; margin-top: 8px;">
                         Clique acima para realizar o envio das guias

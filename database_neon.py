@@ -2,21 +2,12 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
-import sys
 import logging
 from contextlib import contextmanager
 from dotenv import load_dotenv
 
-# Detecta se está rodando como executável PyInstaller (.exe) ou script normal
-if getattr(sys, 'frozen', False):
-    # Executável gerado pelo flet pack / PyInstaller
-    BASE_DIR = os.path.dirname(sys.executable)
-else:
-    # Rodando como script Python normal
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Carrega variáveis de ambiente do .env na mesma pasta do executável/script
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Carrega variáveis de ambiente
+load_dotenv()
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -83,6 +74,10 @@ class NeonDatabase:
                     recurso_inicio DATE,
                     recurso_fim DATE,
                     status VARCHAR(20) DEFAULT 'Ativo',
+                    guia_fisica_1 DATE,
+                    guia_fisica_2 DATE,
+                    guia_fisica_3 DATE,
+                    guia_fisica_4 DATE,
                     UNIQUE(tipo_prestador, referencia)
                 )
             """)
