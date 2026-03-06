@@ -8,7 +8,6 @@ os.environ['FLET_CLI_NO_RICH_OUTPUT'] = '1'
 
 # Resto dos imports
 import flet as ft
-import sqlite3
 import re
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -248,10 +247,10 @@ def main(page: ft.Page):
     page.bgcolor = UNIMED_BG
     page.padding = 20
     page.scroll = ft.ScrollMode.AUTO
-    page.window_min_width = 1000
-    page.window_min_height = 700
-    page.window_width = 1400
-    page.window_height = 900
+    page.window.min_width = 1000
+    page.window.min_height = 700
+    page.window.width = 1400
+    page.window.height = 900
     page.expand = True
 
     # Mostra qual banco está sendo usado
@@ -447,9 +446,10 @@ def main(page: ft.Page):
         txt_nome.value = ""
         txt_email.value = ""
         dd_tipo_prestador.value = None
+        editando_prestador_id = None
         btn_salvar_prestador.text = "Salvar Prestador"
         btn_salvar_prestador.bgcolor = UNIMED_GREEN
-        editando_prestador_id = None
+        btn_salvar_prestador.update()
         page.update()
 
     def limpar_campos_data():
@@ -461,9 +461,10 @@ def main(page: ft.Page):
         txt_rec_ini.value = ""
         txt_rec_fim.value = ""
         dd_status.value = "Ativo"
+        editando_data_id = None
         btn_salvar_data.text = "Salvar Datas"
         btn_salvar_data.bgcolor = UNIMED_GREEN
-        editando_data_id = None
+        btn_salvar_data.update()
         page.update()
 
     async def salvar_prestador_com_feedback(e):
@@ -638,7 +639,7 @@ def main(page: ft.Page):
             content=ft.Text("Tem certeza que deseja excluir este prestador?"),
             actions=[
                 ft.TextButton("Cancelar", on_click=lambda e: setattr(page.dialog, 'open', False) or page.update()),
-                ft.TextButton("Excluir", on_click=confirmar),
+                ft.ElevatedButton("Excluir", on_click=confirmar, bgcolor=ft.Colors.RED_700, color="white"),
             ],
         )
         page.dialog.open = True
@@ -698,7 +699,7 @@ def main(page: ft.Page):
             content=ft.Text("Tem certeza que deseja excluir este período?"),
             actions=[
                 ft.TextButton("Cancelar", on_click=lambda e: setattr(page.dialog, 'open', False) or page.update()),
-                ft.TextButton("Excluir", on_click=confirmar),
+                ft.ElevatedButton("Excluir", on_click=confirmar, bgcolor=ft.Colors.RED_700, color="white"),
             ],
         )
         page.dialog.open = True
@@ -764,7 +765,7 @@ def main(page: ft.Page):
                     INSERT INTO log_envios 
                     (prestador_id, prestador_nome, referencia, tipo_conta, tipo_notificacao, sucesso, mensagem)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (0, nome_teste, "Teste Manual", "Teste", "Teste_Manual", True, "Teste manual de e-mail"))
+                """, (None, nome_teste, "Teste Manual", "Teste", "Teste_Manual", True, "Teste manual de e-mail"))
                 conn.commit()
                 neon_db.return_connection(conn)
                 
@@ -919,41 +920,41 @@ def main(page: ft.Page):
 
     # ====================== BOTÕES ======================
     btn_salvar_prestador = ft.ElevatedButton(
-        text="Salvar Prestador", 
+        text="Salvar Prestador",
         icon=ft.Icons.SAVE,
-        bgcolor=UNIMED_GREEN, 
-        color="white", 
+        bgcolor=UNIMED_GREEN,
+        color="white",
         on_click=salvar_prestador_com_feedback,
         style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
     )
     
     btn_salvar_data = ft.ElevatedButton(
-        text="Salvar Datas", 
+        text="Salvar Datas",
         icon=ft.Icons.SAVE,
-        bgcolor=UNIMED_GREEN, 
-        color="white", 
+        bgcolor=UNIMED_GREEN,
+        color="white",
         on_click=salvar_data_com_feedback,
         style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
     )
     
-    btn_novo_prestador = ft.TextButton(
-        "Novo Prestador", 
-        icon=ft.Icons.ADD, 
+    btn_novo_prestador = ft.ElevatedButton(
+        text="Novo Prestador",
+        icon=ft.Icons.ADD,
         on_click=lambda e: limpar_campos_prestador()
     )
     
-    btn_nova_data = ft.TextButton(
-        "Nova Data", 
-        icon=ft.Icons.ADD, 
+    btn_nova_data = ft.ElevatedButton(
+        text="Nova Data",
+        icon=ft.Icons.ADD,
         on_click=lambda e: limpar_campos_data()
     )
     
     btn_testar_email = ft.ElevatedButton(
         text="Testar E-mail",
         icon=ft.Icons.EMAIL,
-        on_click=testar_email,
         bgcolor=ft.Colors.ORANGE_400,
         color="white",
+        on_click=testar_email,
         style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8))
     )
 
@@ -1107,4 +1108,4 @@ def main(page: ft.Page):
     atualizar_tabela_log()
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.app(main)

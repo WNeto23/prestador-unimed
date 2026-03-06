@@ -1,0 +1,5 @@
+[tool.flet]
+app_name = "UnimedRV"
+product_name = "Unimed RV - Gestão de Prestadores"
+org = "unimed"
+bundle_id = "br.unimed.gestao"

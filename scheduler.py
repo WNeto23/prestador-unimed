@@ -1,16 +1,22 @@
 import schedule
 import time
 from notificador import Notificador
-from database import init_db
-from datetime import datetime
 import logging
+import sys
+import os
+
+# Detecta BASE_DIR (funciona tanto no .exe quanto como script)
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Configura logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('notificacoes.log'),
+        logging.FileHandler(os.path.join(BASE_DIR, 'notificacoes.log'), encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -35,10 +41,7 @@ def job():
 
 def main():
     """Configura e inicia o agendador"""
-    # Inicializa banco de dados
-    init_db()
-    
-    logging.info("Sistema de notificações iniciado")
+    logging.info("Sistema de notificações iniciado (NeonDB)")
     logging.info("Agendado para executar todos os dias às 08:00")
     
     # Agenda para executar todos os dias às 08:00

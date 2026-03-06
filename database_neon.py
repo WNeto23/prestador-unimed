@@ -2,12 +2,21 @@ import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 import os
+import sys
 import logging
 from contextlib import contextmanager
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
-load_dotenv()
+# Detecta se está rodando como executável PyInstaller (.exe) ou script normal
+if getattr(sys, 'frozen', False):
+    # Executável gerado pelo flet pack / PyInstaller
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # Rodando como script Python normal
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Carrega variáveis de ambiente do .env na mesma pasta do executável/script
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)

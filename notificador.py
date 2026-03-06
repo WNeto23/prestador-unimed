@@ -2,6 +2,7 @@ import smtplib
 import logging
 import re
 import os
+import sys
 import time
 import psycopg2
 import sqlite3
@@ -18,8 +19,14 @@ from jinja2 import Template
 import holidays
 from contextlib import contextmanager
 
-# Configuração
-load_dotenv()
+# Detecta se está rodando como executável PyInstaller (.exe) ou script normal
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Carrega variáveis de ambiente do .env na mesma pasta do executável/script
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # Configuração de logging com rotação de arquivos
 logging.basicConfig(
@@ -189,8 +196,11 @@ class Notificador:
         # self.logo_url = "https://i.imgur.com/SUA_LOGO_AQUI.png"
         # ================================================
         
-        # Carrega template HTML
-        template_path = Path(__file__).parent / "templates" / "email_template.html"
+        # Carrega template HTML (compatível com .exe e script normal)
+        # Procura primeiro na raiz (ao lado do .exe), depois na subpasta templates/
+        template_path = Path(BASE_DIR) / "email_template.html"
+        if not template_path.exists():
+            template_path = Path(BASE_DIR) / "templates" / "email_template.html"
         if template_path.exists():
             with open(template_path, 'r', encoding='utf-8') as f:
                 self.template_html = Template(f.read())
