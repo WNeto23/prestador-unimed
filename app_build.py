@@ -654,7 +654,7 @@ def main(page: ft.Page):
             snack.open = True
             page.update()
 
-        page.dialog = ft.AlertDialog(
+        dlg = ft.AlertDialog(
             title=ft.Text("Confirmar exclusão"),
             content=ft.Text("Tem certeza que deseja excluir este prestador?"),
             actions=[
@@ -662,6 +662,8 @@ def main(page: ft.Page):
                 ft.ElevatedButton("Excluir", on_click=confirmar, bgcolor=ft.Colors.RED_700, color="white"),
             ],
         )
+        page.dialog = dlg
+        page.overlay.append(dlg)
         page.dialog.open = True
         page.update()
 
@@ -716,7 +718,7 @@ def main(page: ft.Page):
             snack.open = True
             page.update()
 
-        page.dialog = ft.AlertDialog(
+        dlg = ft.AlertDialog(
             title=ft.Text("Confirmar exclusão"),
             content=ft.Text("Tem certeza que deseja excluir este período?"),
             actions=[
@@ -724,6 +726,8 @@ def main(page: ft.Page):
                 ft.ElevatedButton("Excluir", on_click=confirmar, bgcolor=ft.Colors.RED_700, color="white"),
             ],
         )
+        page.dialog = dlg
+        page.overlay.append(dlg)
         page.dialog.open = True
         page.update()
 

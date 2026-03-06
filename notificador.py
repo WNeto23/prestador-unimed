@@ -477,12 +477,23 @@ END:VCALENDAR"""
         mensagem = ""
 
         # Mensagens específicas por tipo de conta
+        fat_ini_fmt = data_inicio.strftime("%d/%m/%Y")
+        fat_fim_fmt = data_fim.strftime("%d/%m/%Y")
+
         if "Recurso" in tipo_conta:
-            msg_inicio = f"O período para RECURSO DE GLOSAS referente a <strong>{ref}</strong> começou hoje."
+            msg_inicio = (
+                f"O período para <strong>RECURSO DE GLOSAS</strong> referente a <strong>{ref}</strong> começou hoje.<br><br>"
+                f"📅 Período: <strong>{fat_ini_fmt}</strong> até <strong>{fat_fim_fmt}</strong><br>"
+                f"Você tem <strong>{dias_para_fim} dias</strong> para realizar o envio."
+            )
             msg_alerta = f"Faltam <strong>{dias_para_fim} dias</strong> para encerrar o período de RECURSO DE GLOSAS."
             msg_urgente = f"🚨 <strong>URGENTE:</strong> Últimos {dias_para_fim} dias para RECURSO DE GLOSAS!"
         else:
-            msg_inicio = f"O período de FATURAMENTO referente a <strong>{ref}</strong> começou hoje."
+            msg_inicio = (
+                f"O período de <strong>FATURAMENTO DE CONTAS</strong> referente a <strong>{ref}</strong> começou hoje.<br><br>"
+                f"📅 Período: <strong>{fat_ini_fmt}</strong> até <strong>{fat_fim_fmt}</strong><br>"
+                f"Você tem <strong>{dias_para_fim} dias</strong> para realizar o envio das contas."
+            )
             msg_alerta = f"Faltam <strong>{dias_para_fim} dias</strong> para encerrar o período de FATURAMENTO."
             msg_urgente = f"🚨 <strong>URGENTE:</strong> Últimos {dias_para_fim} dias para FATURAMENTO!"
 

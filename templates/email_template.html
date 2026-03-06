@@ -1,3 +1,7 @@
+
+Email template · HTML
+Copiar
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -6,16 +10,16 @@
 </head>
 <body style="margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; background:#f5f5f5;">
     <table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px; margin:20px auto; background:white; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
-        <!-- Cabeçalho com logo (AGORA MENOR) -->
+        <!-- Cabeçalho com logo centralizada -->
         <tr>
-            <td style="background: {{ cor_fundo }}; padding: 15px 20px; text-align: center; border-bottom: 3px solid {{ cor_borda }};">
-                <!-- Logo com fallback para teste local -->
-                <img src="{{ logo_url }}" 
-                     alt="Unimed RV" 
-                     style="height: 40px; width: auto; margin-bottom: 8px; display: inline-block;"
-                     onerror="this.style.display='none'">
-                
-                <div style="background: {{ cor_borda }}; color: white; padding: 6px 12px; border-radius: 20px; display: inline-block; font-size: 13px; font-weight: bold; margin-top: 8px;">
+            <td style="background: {{ cor_fundo }}; padding: 20px; text-align: center; border-bottom: 3px solid {{ cor_borda }};">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <img src="{{ logo_url }}" 
+                         alt="Unimed RV" 
+                         style="height: 45px; width: auto; display: block; margin: 0 auto 10px auto;"
+                         onerror="this.style.display='none'">
+                </div>
+                <div style="background: {{ cor_borda }}; color: white; padding: 6px 20px; border-radius: 20px; display: inline-block; font-size: 13px; font-weight: bold;">
                     {{ tipo_display }}
                 </div>
             </td>
@@ -101,7 +105,7 @@
                               display: inline-block;
                               box-shadow: 0 2px 5px rgba(0,0,0,0.2);
                               font-size: 15px;">
-                        🌐 ACESSAR PORTAL DO PRESTADOR
+                    🌐 ACESSAR PORTAL DO PRESTADOR
                     </a>
                     <p style="font-size: 11px; color: #666; margin-top: 8px;">
                         Clique acima para realizar o envio das guias
