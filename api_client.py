@@ -1,6 +1,5 @@
 """
 api_client.py - Cliente da API Unimed RV
-Substitui a conexão direta com o banco por chamadas HTTP à API
 """
 import os
 import requests
@@ -42,18 +41,21 @@ def listar_prestadores(filtro=""):
                  f in d.get("nome","").lower() or
                  f in d.get("email","").lower()]
     return [(d["id"], d["codigo"], d["nome"], d["email"],
-             d["tipo_prestador"], d.get("data_cadastro","")) for d in dados]
+             d["tipo_prestador"], d.get("data_cadastro",""),
+             d.get("ativo", True)) for d in dados]
 
-def criar_prestador(codigo, nome, email, tipo_prestador):
+def criar_prestador(codigo, nome, email, tipo_prestador, ativo=True):
     return api_post("/prestadores", {
         "codigo": codigo, "nome": nome,
-        "email": email, "tipo_prestador": tipo_prestador
+        "email": email, "tipo_prestador": tipo_prestador,
+        "ativo": ativo
     })
 
-def atualizar_prestador(id, codigo, nome, email, tipo_prestador):
+def atualizar_prestador(id, codigo, nome, email, tipo_prestador, ativo=True):
     return api_put(f"/prestadores/{id}", {
         "codigo": codigo, "nome": nome,
-        "email": email, "tipo_prestador": tipo_prestador
+        "email": email, "tipo_prestador": tipo_prestador,
+        "ativo": ativo
     })
 
 def excluir_prestador(id):
@@ -130,7 +132,8 @@ def registrar_log(prestador_id, prestador_nome, referencia,
 
 # ====================== MÉTRICAS ======================
 def contar_prestadores():
-    return len(api_get("/prestadores"))
+    # Conta apenas ativos
+    return sum(1 for d in api_get("/prestadores") if d.get("ativo", True))
 
 def contar_datas_ativas():
     return sum(1 for d in api_get("/datas") if d.get("status") == "Ativo")

@@ -1,7 +1,6 @@
 # ====================== CONFIGURAÇÃO PARA BUILD ======================
 import os
 import sys
-
 os.environ['FLET_FORCE_LOCAL'] = '1'
 os.environ['FLET_CLI_NO_RICH_OUTPUT'] = '1'
 
@@ -27,11 +26,11 @@ except ImportError as e:
     sys.exit(1)
 
 # ====================== CORES UNIMED ======================
-UNIMED_GREEN  = "#007A33"
-UNIMED_LIGHT  = "#00A651"
-UNIMED_DARK   = "#004d1f"
-UNIMED_BG     = "#0f1a14"
-UNIMED_GRAY   = "#2a3a33"
+UNIMED_GREEN   = "#007A33"
+UNIMED_LIGHT   = "#00A651"
+UNIMED_DARK    = "#004d1f"
+UNIMED_BG      = "#0f1a14"
+UNIMED_GRAY    = "#2a3a33"
 UNIMED_CARD_BG = "#1e2a24"
 
 # ====================== FUNÇÕES AUXILIARES ======================
@@ -76,15 +75,17 @@ def fmt_data(val):
 
 # ====================== FUNÇÕES AUXILIARES DE UI ======================
 def criar_badge_status(status):
-    if status == "Ativo":
-        return ft.Container(
-            content=ft.Text("ATIVO", color="white", size=11, weight="bold"),
-            bgcolor=UNIMED_GREEN,
-            padding=ft.padding.symmetric(vertical=4, horizontal=12),
-            border_radius=20)
+    ativo = status == "Ativo"
     return ft.Container(
-        content=ft.Text("INATIVO", color="white", size=11, weight="bold"),
-        bgcolor=ft.Colors.RED_700,
+        content=ft.Text("ATIVO" if ativo else "INATIVO", color="white", size=11, weight="bold"),
+        bgcolor=UNIMED_GREEN if ativo else ft.Colors.RED_700,
+        padding=ft.padding.symmetric(vertical=4, horizontal=12),
+        border_radius=20)
+
+def criar_badge_prestador(ativo: bool):
+    return ft.Container(
+        content=ft.Text("ATIVO" if ativo else "INATIVO", color="white", size=11, weight="bold"),
+        bgcolor=UNIMED_GREEN if ativo else ft.Colors.RED_700,
         padding=ft.padding.symmetric(vertical=4, horizontal=12),
         border_radius=20)
 
@@ -135,9 +136,7 @@ def main(page: ft.Page):
     page.window.height = 900
     page.expand = True
 
-    snack_bar = ft.SnackBar(
-        content=ft.Text("🌐 Conectado à API Unimed RV"),
-        bgcolor=UNIMED_GREEN)
+    snack_bar = ft.SnackBar(content=ft.Text("🌐 Conectado à API Unimed RV"), bgcolor=UNIMED_GREEN)
     page.overlay.append(snack_bar)
     snack_bar.open = True
 
@@ -145,12 +144,9 @@ def main(page: ft.Page):
         from notificador import Notificador
         notificador = Notificador()
         print("✅ Notificador carregado com sucesso!")
-    except ImportError as e:
-        notificador = None
-        print(f"⚠️ Notificador não encontrado: {e}")
     except Exception as e:
         notificador = None
-        print(f"⚠️ Erro ao carregar notificador: {e}")
+        print(f"⚠️ Notificador não disponível: {e}")
 
     editando_prestador_id: int | None = None
     editando_data_id: int | None = None
@@ -168,6 +164,13 @@ def main(page: ft.Page):
             ft.dropdown.Option("Prestadores Credenciados"),
             ft.dropdown.Option("Demais Prestadores"),
         ])
+    dd_ativo_prestador = ft.Dropdown(
+        label="Status do Prestador", border_color=UNIMED_GREEN, dense=True,
+        value="Ativo",
+        options=[
+            ft.dropdown.Option("Ativo"),
+            ft.dropdown.Option("Inativo"),
+        ])
 
     # ====================== CAMPOS DATAS ======================
     dd_tipo_envio  = ft.Dropdown(label="Tipo de Prestador", border_color=UNIMED_GREEN, dense=True,
@@ -176,23 +179,18 @@ def main(page: ft.Page):
     dd_status      = ft.Dropdown(label="Status", value="Ativo", border_color=UNIMED_GREEN, dense=True,
                                   options=[ft.dropdown.Option("Ativo"), ft.dropdown.Option("Inativo")])
     txt_fat_ini = ft.TextField(label="Faturamento Início", hint_text="26/01/2026", border_color=UNIMED_GREEN, dense=True)
-    txt_fat_fim = ft.TextField(label="Faturamento Fim",   hint_text="25/02/2026", border_color=UNIMED_GREEN, dense=True)
-    txt_rec_ini = ft.TextField(label="Recurso Início",    hint_text="07/02/2026", border_color=UNIMED_GREEN, dense=True)
-    txt_rec_fim = ft.TextField(label="Recurso Fim",       hint_text="25/02/2026", border_color=UNIMED_GREEN, dense=True)
+    txt_fat_fim = ft.TextField(label="Faturamento Fim",    hint_text="25/02/2026", border_color=UNIMED_GREEN, dense=True)
+    txt_rec_ini = ft.TextField(label="Recurso Início",     hint_text="07/02/2026", border_color=UNIMED_GREEN, dense=True)
+    txt_rec_fim = ft.TextField(label="Recurso Fim",        hint_text="25/02/2026", border_color=UNIMED_GREEN, dense=True)
 
     # ====================== CAMPOS GUIAS FÍSICAS ======================
-    txt_guia1 = ft.TextField(label="Entrega 1ª Data", hint_text="02/03/2026",
-                              border_color=ft.Colors.BLUE_400, dense=True)
-    txt_guia2 = ft.TextField(label="Entrega 2ª Data", hint_text="09/03/2026",
-                              border_color=ft.Colors.BLUE_400, dense=True)
-    txt_guia3 = ft.TextField(label="Entrega 3ª Data", hint_text="16/03/2026",
-                              border_color=ft.Colors.BLUE_400, dense=True)
-    txt_guia4 = ft.TextField(label="Entrega 4ª Data", hint_text="20/03/2026",
-                              border_color=ft.Colors.BLUE_400, dense=True)
-    txt_guia5 = ft.TextField(label="Entrega 5ª Data (último dia)", hint_text="27/03/2026",
-                              border_color=ft.Colors.BLUE_400, dense=True)
+    txt_guia1 = ft.TextField(label="Entrega 1ª Data", hint_text="02/03/2026", border_color=ft.Colors.BLUE_400, dense=True)
+    txt_guia2 = ft.TextField(label="Entrega 2ª Data", hint_text="09/03/2026", border_color=ft.Colors.BLUE_400, dense=True)
+    txt_guia3 = ft.TextField(label="Entrega 3ª Data", hint_text="16/03/2026", border_color=ft.Colors.BLUE_400, dense=True)
+    txt_guia4 = ft.TextField(label="Entrega 4ª Data", hint_text="20/03/2026", border_color=ft.Colors.BLUE_400, dense=True)
+    txt_guia5 = ft.TextField(label="Entrega 5ª Data (último dia)", hint_text="27/03/2026", border_color=ft.Colors.BLUE_400, dense=True)
 
-    # ====================== CAMPOS DE FILTRO ======================
+    # ====================== FILTROS ======================
     txt_filtro_prestadores = ft.TextField(
         label="Filtrar prestadores...", hint_text="Nome ou código",
         prefix_icon=ft.Icons.SEARCH, border_color=UNIMED_GREEN, dense=True, expand=True,
@@ -225,6 +223,7 @@ def main(page: ft.Page):
             ft.DataColumn(ft.Text("Nome")),
             ft.DataColumn(ft.Text("E-mail")),
             ft.DataColumn(ft.Text("Tipo")),
+            ft.DataColumn(ft.Text("Status")),
             ft.DataColumn(ft.Text("Data Cad.")),
             ft.DataColumn(ft.Text("Ações")),
         ],
@@ -262,8 +261,9 @@ def main(page: ft.Page):
         nonlocal editando_prestador_id
         txt_codigo.value = ""; txt_nome.value = ""
         txt_email.value  = ""; dd_tipo_prestador.value = None
+        dd_ativo_prestador.value = "Ativo"
         editando_prestador_id = None
-        btn_salvar_prestador.text   = "Salvar Prestador"
+        btn_salvar_prestador.text    = "Salvar Prestador"
         btn_salvar_prestador.bgcolor = UNIMED_GREEN
         btn_salvar_prestador.update()
         page.update()
@@ -271,8 +271,8 @@ def main(page: ft.Page):
     def limpar_campos_data():
         nonlocal editando_data_id
         dd_tipo_envio.value = None; txt_referencia.value = ""
-        txt_fat_ini.value   = ""; txt_fat_fim.value = ""
-        txt_rec_ini.value   = ""; txt_rec_fim.value = ""
+        txt_fat_ini.value = ""; txt_fat_fim.value = ""
+        txt_rec_ini.value = ""; txt_rec_fim.value = ""
         txt_guia1.value = ""; txt_guia2.value = ""
         txt_guia3.value = ""; txt_guia4.value = ""; txt_guia5.value = ""
         dd_status.value = "Ativo"
@@ -288,12 +288,14 @@ def main(page: ft.Page):
             snack = ft.SnackBar(content=ft.Text("Preencha todos os campos!"))
             page.overlay.append(snack); snack.open = True; page.update(); return
         try:
+            ativo = dd_ativo_prestador.value != "Inativo"
             if editando_prestador_id:
                 atualizar_prestador(editando_prestador_id, txt_codigo.value,
-                                    txt_nome.value, txt_email.value, dd_tipo_prestador.value)
+                                    txt_nome.value, txt_email.value,
+                                    dd_tipo_prestador.value, ativo)
             else:
                 criar_prestador(txt_codigo.value, txt_nome.value,
-                                txt_email.value, dd_tipo_prestador.value)
+                                txt_email.value, dd_tipo_prestador.value, ativo)
             msg = "Prestador atualizado!" if editando_prestador_id else "Prestador cadastrado!"
             btn_salvar_prestador.text    = "✓ Sucesso!"
             btn_salvar_prestador.bgcolor = ft.Colors.GREEN_700
@@ -320,7 +322,6 @@ def main(page: ft.Page):
             rec_ini = parse_data(txt_rec_ini); rec_fim = parse_data(txt_rec_fim)
             g1 = parse_data(txt_guia1); g2 = parse_data(txt_guia2)
             g3 = parse_data(txt_guia3); g4 = parse_data(txt_guia4); g5 = parse_data(txt_guia5)
-
             if editando_data_id:
                 atualizar_data(editando_data_id, dd_tipo_envio.value, txt_referencia.value,
                                fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value,
@@ -329,7 +330,6 @@ def main(page: ft.Page):
                 criar_data(dd_tipo_envio.value, txt_referencia.value,
                            fat_ini, fat_fim, rec_ini, rec_fim, dd_status.value,
                            g1, g2, g3, g4, g5)
-
             msg = "Datas atualizadas!" if editando_data_id else "Datas cadastradas!"
             btn_salvar_data.text    = "✓ Sucesso!"
             btn_salvar_data.bgcolor = ft.Colors.GREEN_700
@@ -353,6 +353,7 @@ def main(page: ft.Page):
             editando_prestador_id = id
             txt_codigo.value = row["codigo"]; txt_nome.value = row["nome"]
             txt_email.value  = row["email"];  dd_tipo_prestador.value = row["tipo_prestador"]
+            dd_ativo_prestador.value = "Ativo" if row.get("ativo", True) else "Inativo"
             btn_salvar_prestador.text = "Atualizar Prestador"
             page.update()
 
@@ -376,10 +377,8 @@ def main(page: ft.Page):
                 ft.TextButton("Cancelar", on_click=lambda e: setattr(page.dialog,'open',False) or page.update()),
                 ft.ElevatedButton("Excluir", on_click=confirmar, bgcolor=ft.Colors.RED_700, color="white"),
             ])
-        page.dialog = dlg
-        page.overlay.append(dlg)
-        page.dialog.open = True
-        page.update()
+        page.dialog = dlg; page.overlay.append(dlg)
+        page.dialog.open = True; page.update()
 
     def editar_data(id: int):
         nonlocal editando_data_id
@@ -397,7 +396,6 @@ def main(page: ft.Page):
             txt_guia3.value   = fmt_data(row.get("guia_fisica_3"))
             txt_guia4.value   = fmt_data(row.get("guia_fisica_4"))
             txt_guia5.value   = fmt_data(row.get("guia_fisica_5"))
-            # Limpa "-" que vieram do fmt_data para campos vazios
             for c in [txt_fat_ini,txt_fat_fim,txt_rec_ini,txt_rec_fim,
                       txt_guia1,txt_guia2,txt_guia3,txt_guia4,txt_guia5]:
                 if c.value == "-": c.value = ""
@@ -419,20 +417,16 @@ def main(page: ft.Page):
                 ft.TextButton("Cancelar", on_click=lambda e: setattr(page.dialog,'open',False) or page.update()),
                 ft.ElevatedButton("Excluir", on_click=confirmar, bgcolor=ft.Colors.RED_700, color="white"),
             ])
-        page.dialog = dlg
-        page.overlay.append(dlg)
-        page.dialog.open = True
-        page.update()
+        page.dialog = dlg; page.overlay.append(dlg)
+        page.dialog.open = True; page.update()
 
     # ====================== TESTE DE E-MAIL ======================
     def testar_email(e):
         if notificador is None:
             snack = ft.SnackBar(content=ft.Text("❌ Notificador não disponível!"))
             page.overlay.append(snack); snack.open = True; page.update(); return
-
         email_teste = txt_email.value if txt_email.value else None
         nome_teste  = txt_nome.value  if txt_nome.value  else "Prestador Teste"
-
         if not email_teste:
             dados = listar_prestadores()
             if dados:
@@ -443,19 +437,16 @@ def main(page: ft.Page):
         try:
             snack = ft.SnackBar(content=ft.Text("⏳ Enviando e-mail de teste..."))
             page.overlay.append(snack); snack.open = True; page.update()
-
             html = notificador.criar_card_email(
                 titulo="🔧 TESTE DO SISTEMA",
                 mensagem="Esta é uma mensagem de teste do sistema de notificações da Unimed RV.",
                 prestador=nome_teste, referencia="Teste Manual",
                 tipo_conta="Faturamento Contas",
                 data_fim=date.today() + timedelta(days=5), dias_restantes=5)
-
             sucesso = notificador.enviar_email(
                 destinatario=email_teste,
                 assunto="🔧 Teste do Sistema - Unimed RV",
                 html_content=html)
-
             if sucesso:
                 registrar_log(None, nome_teste, "Teste Manual", "Teste",
                               "Teste_Manual", True, "Teste manual de e-mail")
@@ -463,7 +454,6 @@ def main(page: ft.Page):
                 atualizar_tabela_log()
             else:
                 snack = ft.SnackBar(content=ft.Text("❌ Falha no envio. Verifique configurações."))
-
             page.overlay.append(snack); snack.open = True; page.update()
         except Exception as ex:
             snack = ft.SnackBar(content=ft.Text(f"❌ Erro: {str(ex)}"))
@@ -486,20 +476,24 @@ def main(page: ft.Page):
 
     def atualizar_tabela_prestadores():
         tabela_prestadores.rows.clear()
-        for id_, codigo, nome, email, tipo, data_cad in listar_prestadores(filtro_prestadores):
-            tabela_prestadores.rows.append(ft.DataRow(cells=[
-                ft.DataCell(ft.Text(codigo, weight="bold")),
-                ft.DataCell(ft.Text(nome)),
-                ft.DataCell(ft.Text(email)),
-                ft.DataCell(ft.Text(tipo)),
-                ft.DataCell(ft.Text(str(data_cad))),
-                ft.DataCell(ft.Row([
-                    ft.IconButton(icon=ft.Icons.EDIT, icon_color=ft.Colors.BLUE_300,
-                                  tooltip="Editar", on_click=lambda e, rid=id_: editar_prestador(rid)),
-                    ft.IconButton(icon=ft.Icons.DELETE, icon_color=ft.Colors.RED_300,
-                                  tooltip="Excluir", on_click=lambda e, rid=id_: excluir_prestador_dlg(rid)),
-                ], spacing=5))
-            ]))
+        for row in listar_prestadores(filtro_prestadores):
+            id_, codigo, nome, email, tipo, data_cad, ativo = row
+            tabela_prestadores.rows.append(ft.DataRow(
+                cells=[
+                    ft.DataCell(ft.Text(codigo, weight="bold")),
+                    ft.DataCell(ft.Text(nome, color=None if ativo else ft.Colors.GREY_500)),
+                    ft.DataCell(ft.Text(email, color=None if ativo else ft.Colors.GREY_500)),
+                    ft.DataCell(ft.Text(tipo)),
+                    ft.DataCell(criar_badge_prestador(ativo)),
+                    ft.DataCell(ft.Text(str(data_cad))),
+                    ft.DataCell(ft.Row([
+                        ft.IconButton(icon=ft.Icons.EDIT, icon_color=ft.Colors.BLUE_300,
+                                      tooltip="Editar", on_click=lambda e, rid=id_: editar_prestador(rid)),
+                        ft.IconButton(icon=ft.Icons.DELETE, icon_color=ft.Colors.RED_300,
+                                      tooltip="Excluir", on_click=lambda e, rid=id_: excluir_prestador_dlg(rid)),
+                    ], spacing=5))
+                ]
+            ))
         page.update()
 
     def atualizar_tabela_datas():
@@ -549,9 +543,9 @@ def main(page: ft.Page):
         total_prest, datas_ativas, falhas = calcular_metricas()
         metricas_row.controls.clear()
         metricas_row.controls.extend([
-            criar_card_metrica("Prestadores",    total_prest,   ft.Colors.BLUE_400,  ft.Icons.PEOPLE),
-            criar_card_metrica("Períodos Ativos", datas_ativas, UNIMED_GREEN,         ft.Icons.CALENDAR_MONTH),
-            criar_card_metrica("Falhas (7d)",    falhas,        ft.Colors.RED_400,   ft.Icons.ERROR),
+            criar_card_metrica("Prestadores Ativos", total_prest, ft.Colors.BLUE_400,  ft.Icons.PEOPLE),
+            criar_card_metrica("Períodos Ativos",    datas_ativas, UNIMED_GREEN,        ft.Icons.CALENDAR_MONTH),
+            criar_card_metrica("Falhas (7d)",        falhas,       ft.Colors.RED_400,   ft.Icons.ERROR),
         ])
         page.update()
 
@@ -579,9 +573,9 @@ def main(page: ft.Page):
     metricas_row = ft.ResponsiveRow([])
     total_prest, datas_ativas, falhas = calcular_metricas()
     metricas_row.controls.extend([
-        criar_card_metrica("Prestadores",    total_prest,   ft.Colors.BLUE_400, ft.Icons.PEOPLE),
-        criar_card_metrica("Períodos Ativos", datas_ativas, UNIMED_GREEN,       ft.Icons.CALENDAR_MONTH),
-        criar_card_metrica("Falhas (7d)",    falhas,        ft.Colors.RED_400,  ft.Icons.ERROR),
+        criar_card_metrica("Prestadores Ativos", total_prest, ft.Colors.BLUE_400, ft.Icons.PEOPLE),
+        criar_card_metrica("Períodos Ativos",    datas_ativas, UNIMED_GREEN,      ft.Icons.CALENDAR_MONTH),
+        criar_card_metrica("Falhas (7d)",        falhas,       ft.Colors.RED_400, ft.Icons.ERROR),
     ])
 
     # ====================== ABAS ======================
@@ -595,10 +589,11 @@ def main(page: ft.Page):
                     ft.Column([txt_email],  col={"sm": 12, "md": 4}),
                 ]),
                 ft.ResponsiveRow([
-                    ft.Column([dd_tipo_prestador],   col={"sm": 12, "md": 6}),
+                    ft.Column([dd_tipo_prestador],   col={"sm": 12, "md": 5}),
+                    ft.Column([dd_ativo_prestador],  col={"sm": 12, "md": 3}),
                     ft.Column([btn_salvar_prestador], col={"sm": 6,  "md": 2}),
                     ft.Column([btn_novo_prestador],   col={"sm": 3,  "md": 1}),
-                    ft.Column([btn_testar_email],     col={"sm": 3,  "md": 2}),
+                    ft.Column([btn_testar_email],     col={"sm": 3,  "md": 1}),
                 ]),
             ]),
             padding=20, bgcolor=UNIMED_CARD_BG, border_radius=12),

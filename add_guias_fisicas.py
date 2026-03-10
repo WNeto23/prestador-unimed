@@ -1,6 +1,15 @@
-from database_neon import neon_db
+import os
+import psycopg2
+from dotenv import load_dotenv
 
-conn = neon_db.get_connection()
+load_dotenv()
+
+DATABASE_URL = os.getenv("NEON_DATABASE_URL")
+
+if not DATABASE_URL:
+    raise EnvironmentError("❌ Variável NEON_DATABASE_URL não encontrada no .env")
+
+conn = psycopg2.connect(DATABASE_URL)
 cursor = conn.cursor()
 
 print("🔄 Adicionando colunas de guias físicas...")
@@ -22,5 +31,6 @@ for coluna in colunas:
         print(f"  ⚠️ {nome}: {e}")
 
 conn.commit()
-neon_db.return_connection(conn)
+cursor.close()
+conn.close()
 print("\n✅ Pronto! Colunas de guias físicas criadas no NeonDB.")

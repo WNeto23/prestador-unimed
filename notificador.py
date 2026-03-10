@@ -375,16 +375,17 @@ END:VCALENDAR"""
 
         try:
             # Busca todos os prestadores e períodos ativos via API
-            prestadores = listar_prestadores()   # [(id, codigo, nome, email, tipo, data_cad)]
+            todos = listar_prestadores()  # [(id, codigo, nome, email, tipo, data_cad, ativo)]
+            prestadores = [p for p in todos if p[6]]  # apenas ativos
             datas_ativas = [
                 row for row in listar_datas_envio()
                 if row[7] == "Ativo"              # índice 7 = status
             ]
 
-            logger.info(f"👥 Prestadores: {len(prestadores)} | 📅 Períodos ativos: {len(datas_ativas)}")
+            logger.info(f"👥 Prestadores ativos: {len(prestadores)}/{len(todos)} | 📅 Períodos ativos: {len(datas_ativas)}")
 
             for idx, prest in enumerate(prestadores):
-                prest_id, _, nome, email, tipo_prest, _ = prest
+                prest_id, _, nome, email, tipo_prest, _, _ = prest
 
                 if not self.is_email_valido(email):
                     logger.warning(f"⚠️ E-mail inválido: {nome} <{email}>")
