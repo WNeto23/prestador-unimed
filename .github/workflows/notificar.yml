@@ -1,122 +1,129 @@
-name: 🤖 Notificar Prestadores - Unimed RV (NeonDB)
+name: 🤖 Notificar Prestadores - Unimed RV
 on:
- schedule:
-   - cron: '0 12 * * *'  # 09:00 BRT (12:00 UTC)
- workflow_dispatch:
-# 🔐 Permissões para permitir criação de issues
+  schedule:
+    - cron: '0 12 * * *'  # 09:00 BRT (12:00 UTC)
+  workflow_dispatch:
+
 permissions:
- contents: read
- issues: write
+  contents: read
+  issues: write
+
 jobs:
- notificar:
-   name: 📧 Enviar Notificações
-   runs-on: ubuntu-latest
-   environment: producao
-   timeout-minutes: 10
-   steps:
-     # 1. Verificar segredos
-     - name: 🔍 Verificar Segredos Obrigatórios
-       env:
-         NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-         EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
-         EMAIL_LOGIN_PASS: ${{ secrets.EMAIL_LOGIN_PASS }}
-         EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
-       run: |
-         echo "🔐 Verificando credenciais..."
-         echo "✅ Data/Hora: $(date -u)"
-         echo "🕐 UTC: $(date -u +%H:%M)"
-         echo "🕐 BRT: $(TZ=America/Sao_Paulo date +%H:%M)"
-         if [ -z "$NEON_DATABASE_URL" ]; then
-           echo "❌ ERRO: Secret NEON_DATABASE_URL não configurado!"
-           exit 1
-         fi
-         if [ -z "$EMAIL_LOGIN" ]; then
-           echo "❌ ERRO: Secret EMAIL_LOGIN não configurado!"
-           exit 1
-         fi
-         if [ -z "$EMAIL_LOGIN_PASS" ]; then
-           echo "❌ ERRO: Secret EMAIL_LOGIN_PASS não configurado!"
-           exit 1
-         fi
-         if [ -z "$EMAIL_REMETENTE" ]; then
-           echo "❌ ERRO: Secret EMAIL_REMETENTE não configurado!"
-           exit 1
-         fi
-         echo "✅ Todos os segredos estão configurados!"
-     # 2. Checkout
-     - name: 📥 Checkout do Repositório
-       uses: actions/checkout@v4
-       with:
-         fetch-depth: 1
-     # 3. Python estável
-     - name: 🐍 Configurar Python
-       uses: actions/setup-python@v5
-       with:
-         python-version: '3.11'
-         cache: 'pip'
-     # 4. Instalar dependências
-     - name: 📦 Instalar Dependências
-       run: |
-         python -m pip install --upgrade pip
-         pip install psycopg2-binary \
-                     python-dotenv \
-                     holidays \
-                     jinja2
-         echo "📋 Dependências instaladas:"
-         pip list
-     # 5. Executar notificador
-     - name: 📧 Executar Notificador (NeonDB)
-       env:
-         NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-         EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
-         EMAIL_LOGIN_PASS: ${{ secrets.EMAIL_LOGIN_PASS }}
-         EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
-         URL_PORTAL: ${{ secrets.URL_PORTAL || 'https://portal.unimedrv.com.br' }}
-         EMAIL_CONTATO: ${{ secrets.EMAIL_CONTATO || 'prestador@unimedrv.com.br' }}
-         TZ: America/Sao_Paulo
-       run: |
-         echo "🚀 Iniciando notificador em $(date)"
-         echo "📧 Remetente: $EMAIL_REMETENTE"
-         echo "🗄️ Banco: NeonDB (PostgreSQL)"
-         python notificador.py 2>&1 | tee notificador_output.log
-         if [ ${PIPESTATUS[0]} -eq 0 ]; then
-           echo "✅ Notificador executado com sucesso!"
-         else
-           echo "❌ Notificador falhou!"
-           exit 1
-         fi
-     # 6. Upload logs
-     - name: 📤 Upload de Logs para Auditoria
-       if: always()
-       uses: actions/upload-artifact@v4
-       with:
-         name: logs-notificacoes-${{ github.run_id }}
-         path: |
-           *.log
-           notificador_output.log
-         retention-days: 90
-         if-no-files-found: warn
-     # 7. Criar issue se falhar
-     - name: 🔔 Criar Issue em Caso de Falha
-       if: failure()
-       uses: actions/github-script@v7
-       with:
-         script: |
-           const title = `🚨 Falha na Notificação - ${new Date().toLocaleDateString('pt-BR')}`;
-           const body = `
-           ## ❌ Falha na Notificação Automática
-           **Data/Hora:** ${new Date().toLocaleString('pt-BR')}
-           **Workflow:** ${context.workflow}
-           **Run ID:** ${context.runId}
-           ### 📋 Logs
-           ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
-           ### ⚡ Ação Necessária
-           Verifique os logs e corrija o problema manualmente.
-           `;
-           await github.rest.issues.create({
-             owner: context.repo.owner,
-             repo: context.repo.repo,
-             title: title,
-             body: body,
-             labels: ['bug', 'automation-failed']
-           });
+  notificar:
+    name: 📧 Enviar Notificações
+    runs-on: ubuntu-latest
+    environment: producao
+    timeout-minutes: 10
+
+    steps:
+      # 1. Verificar segredos
+      - name: 🔍 Verificar Segredos Obrigatórios
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
+          EMAIL_LOGIN_PASS: ${{ secrets.EMAIL_LOGIN_PASS }}
+        run: |
+          echo "🔐 Verificando credenciais..."
+          echo "✅ Data/Hora: $(date -u)"
+          echo "🕐 BRT: $(TZ=America/Sao_Paulo date +%H:%M)"
+          if [ -z "$API_URL" ]; then
+            echo "❌ ERRO: Secret API_URL não configurado!"
+            exit 1
+          fi
+          if [ -z "$API_TOKEN" ]; then
+            echo "❌ ERRO: Secret API_TOKEN não configurado!"
+            exit 1
+          fi
+          if [ -z "$EMAIL_LOGIN" ]; then
+            echo "❌ ERRO: Secret EMAIL_LOGIN não configurado!"
+            exit 1
+          fi
+          if [ -z "$EMAIL_LOGIN_PASS" ]; then
+            echo "❌ ERRO: Secret EMAIL_LOGIN_PASS não configurado!"
+            exit 1
+          fi
+          echo "✅ Todos os segredos estão configurados!"
+
+      # 2. Checkout
+      - name: 📥 Checkout do Repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # 3. Python
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # 4. Instalar dependências (sem psycopg2 - usa API agora)
+      - name: 📦 Instalar Dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests \
+                      python-dotenv \
+                      holidays \
+                      jinja2
+          echo "📋 Dependências instaladas:"
+          pip list
+
+      # 5. Executar notificador
+      - name: 📧 Executar Notificador
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          EMAIL_LOGIN: ${{ secrets.EMAIL_LOGIN }}
+          EMAIL_LOGIN_PASS: ${{ secrets.EMAIL_LOGIN_PASS }}
+          EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE || 'prestador@unimedrv.com.br' }}
+          EMAIL_CONTATO: ${{ secrets.EMAIL_CONTATO || 'prestador@unimedrv.com.br' }}
+          URL_PORTAL: ${{ secrets.URL_PORTAL || 'https://portal.unimedrv.com.br/PlanodeSaude/index.jsp' }}
+          TZ: America/Sao_Paulo
+        run: |
+          echo "🚀 Iniciando notificador em $(date)"
+          echo "🌐 API: $API_URL"
+          python notificador.py 2>&1 | tee notificador_output.log
+          if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            echo "✅ Notificador executado com sucesso!"
+          else
+            echo "❌ Notificador falhou!"
+            exit 1
+          fi
+
+      # 6. Upload logs
+      - name: 📤 Upload de Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-notificacoes-${{ github.run_id }}
+          path: |
+            *.log
+            notificador_output.log
+          retention-days: 90
+          if-no-files-found: warn
+
+      # 7. Criar issue se falhar
+      - name: 🔔 Criar Issue em Caso de Falha
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🚨 Falha na Notificação - ${new Date().toLocaleDateString('pt-BR')}`;
+            const body = `
+            ## ❌ Falha na Notificação Automática
+            **Data/Hora:** ${new Date().toLocaleString('pt-BR')}
+            **Workflow:** ${context.workflow}
+            **Run ID:** ${context.runId}
+            ### 📋 Logs
+            ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+            ### ⚡ Ação Necessária
+            Verifique os logs e corrija o problema manualmente.
+            `;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'automation-failed']
+            });

@@ -5,8 +5,8 @@ a = Analysis(
     ['app_build.py'],
     pathex=[],
     binaries=[],
-    datas=[('database_neon.py', '.'), ('notificador.py', '.'), ('templates/email_template.html', '.')],
-    hiddenimports=['psycopg2', 'psycopg2.extras', 'psycopg2._psycopg', 'dotenv'],
+    datas=[('api_client.py', '.'), ('notificador.py', '.'), ('templates/email_template.html', 'templates')],
+    hiddenimports=['requests', 'dotenv'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -32,7 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    version='C:\\Users\\WALTUI~1.NET\\AppData\\Local\\Temp\\cd72920d-6d10-4e84-bc99-45142db40568',
+    version='C:\\Users\\WALTUI~1.NET\\AppData\\Local\\Temp\\c0084459-a214-42b1-9fe6-8d5e1b223905',
     icon=['unimed_rv.ico'],
 )
 coll = COLLECT(
