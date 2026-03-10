@@ -28,3 +28,18 @@ alerta_10.html
 *.bat
 fix_sequences.py
 teste_envio.py
+
+# Build
+dist/
+build/
+
+# Python
+__pycache__/
+*.pyc
+
+# Ambiente virtual
+.venv/
+env/
+
+# Variáveis de ambiente
+.env
